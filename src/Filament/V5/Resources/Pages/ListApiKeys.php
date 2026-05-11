@@ -12,11 +12,17 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Auth;
 
 class ListApiKeys extends ListRecords
 {
     protected static string $resource = ApiKeyResource::class;
+
+    public function getMaxContentWidth(): Width | string | null
+    {
+        return Width::Full;
+    }
 
     protected function getHeaderActions(): array
     {

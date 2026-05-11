@@ -29,6 +29,7 @@ class FilamentApiForgeServiceProvider extends PackageServiceProvider
                 'create_api_forge_resource_settings_table',
                 'add_method_settings_to_api_forge_resource_settings_table',
                 'refactor_api_forge_tokens_to_hash_based',
+                'create_api_forge_global_settings_table',
             ])
             ->hasViews();
     }
@@ -50,12 +51,15 @@ class FilamentApiForgeServiceProvider extends PackageServiceProvider
     {
         $prefix = config('filament-api-forge.api_prefix', 'api/v1');
 
-        // Public route: OpenAPI spec (no auth)
+        // Public routes: OpenAPI spec + public docs HTML (no auth)
         Route::prefix($prefix)
             ->middleware(config('filament-api-forge.discovery.middleware', ['api']))
             ->group(function () {
                 Route::get('docs/openapi.json', [\YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController::class, 'openApiSpec'])
                     ->name('api-forge.docs.openapi');
+
+                Route::get('docs', [\YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController::class, 'publicDocs'])
+                    ->name('api-forge.docs.public');
             });
 
         // Protected API routes

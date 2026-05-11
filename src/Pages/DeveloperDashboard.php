@@ -21,7 +21,8 @@ class DeveloperDashboard extends Page
     public int    $resourceCount   = 0;
     public int    $totalEndpoints  = 0;
     public int    $activeTokens    = 0;
-    public int    $totalRequests   = 0;
+    public int    $totalRequests         = 0;
+    public string $formattedTotalRequests = '0';
     public string $apiBaseUrl      = '';
     public string $apiVersion      = '';
 
@@ -50,6 +51,15 @@ class DeveloperDashboard extends Page
             ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->count();
 
-        $this->totalRequests  = (int) ApiForgeToken::sum('request_count');
+        $this->totalRequests          = (int) ApiForgeToken::sum('request_count');
+        $this->formattedTotalRequests = self::abbreviateCount($this->totalRequests);
+    }
+
+    public static function abbreviateCount(int $n): string
+    {
+        if ($n >= 1_000_000_000) return round($n / 1_000_000_000, 1) . 'B';
+        if ($n >= 1_000_000)     return round($n / 1_000_000, 1) . 'M';
+        if ($n >= 1_000)         return round($n / 1_000, 1) . 'K';
+        return (string) $n;
     }
 }

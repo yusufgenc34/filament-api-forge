@@ -71,7 +71,8 @@ class ApiResourceController extends Controller
         // Searchable
         $searchable = $resource['api_config']['searchable'] ?? [];
         if (! empty($searchable) && $request->has('search')) {
-            $searchTerm = $request->input('search');
+            // Escape LIKE metacharacters to prevent wildcard injection
+            $searchTerm = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $request->input('search', ''));
             $query->where(function ($q) use ($searchable, $searchTerm) {
                 foreach ($searchable as $i => $column) {
                     $method = $i === 0 ? 'where' : 'orWhere';

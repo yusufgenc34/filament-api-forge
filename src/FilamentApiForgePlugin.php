@@ -2,7 +2,9 @@
 
 namespace YusufGenc34\FilamentApiForge;
 
+use YusufGenc34\FilamentApiForge\Pages\AccessControl;
 use YusufGenc34\FilamentApiForge\Pages\ApiDocumentation;
+use YusufGenc34\FilamentApiForge\Pages\ApiSettings;
 use YusufGenc34\FilamentApiForge\Pages\DeveloperDashboard;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
@@ -56,8 +58,12 @@ class FilamentApiForgePlugin implements Plugin
         [$resourceClass] = $this->resolveClasses();
 
         if ($this->hasApiKeys)   $resources[] = $resourceClass;
-        if ($this->hasDocs)      $pages[]     = ApiDocumentation::class;
-        if ($this->hasDashboard) $pages[]     = DeveloperDashboard::class;
+        if ($this->hasDocs) {
+            $pages[] = ApiDocumentation::class;
+            $pages[] = AccessControl::class;
+            $pages[] = ApiSettings::class;
+        }
+        if ($this->hasDashboard) $pages[] = DeveloperDashboard::class;
 
         $panel->resources($resources)->pages($pages);
     }

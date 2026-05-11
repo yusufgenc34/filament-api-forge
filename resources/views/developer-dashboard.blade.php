@@ -228,7 +228,7 @@ $pathMap = [
         </div>
         <div class="dd-stat">
             <div class="dd-stat-label">Total Requests</div>
-            <div class="dd-stat-value">{{ number_format($totalRequests) }}</div>
+            <div class="dd-stat-value" title="{{ number_format($totalRequests) }}">{{ $formattedTotalRequests }}</div>
             <div class="dd-stat-sub">All-time API calls</div>
         </div>
     </div>

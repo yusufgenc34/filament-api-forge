@@ -5,8 +5,9 @@ namespace YusufGenc34\FilamentApiForge\Pages;
 use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
 use YusufGenc34\FilamentApiForge\Contracts\HasApi;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
@@ -36,12 +37,11 @@ class ApiDocumentation extends Page
     public ?array  $selectedEndpoint   = null;
     public ?string $selectedSchemaName = null;
 
-    public array $resourceStates = [];
-
-    public bool   $tryPanelOpen   = false;
-    public string $tryToken       = '';
-    public string $tryUrl         = '';
-    public string $tryBody        = '{}';
+    public bool   $docsPublic   = false;
+    public bool   $tryPanelOpen = false;
+    public string $tryToken     = '';
+    public string $tryUrl       = '';
+    public string $tryBody      = '{}';
     public array  $tryQueryParams = [];
 
     public function getMaxContentWidth(): Width | string | null
@@ -62,6 +62,8 @@ class ApiDocumentation extends Page
         $this->responseComponents = $data['components']['responses'] ?? [];
         $this->openApiUrl         = route('api-forge.docs.openapi');
 
+        $this->docsPublic = (bool) ApiForgeGlobalSetting::get('docs_public', false);
+
         $grouped = [];
         foreach ($data['paths'] ?? [] as $path => $methods) {
             foreach ($methods as $method => $operation) {
@@ -78,44 +80,54 @@ class ApiDocumentation extends Page
         }
         $this->groupedEndpoints = $grouped;
 
-        $this->loadResourceStates();
-
         if (!empty($grouped)) {
             $firstGroup = array_key_first($grouped);
             $this->selectEndpoint($grouped[$firstGroup][0]['id']);
         }
     }
 
-    public function toggleResource(string $resourceClass): void
+    public function togglePublicDocs(): void
     {
-        ApiForgeResourceSetting::forResource($resourceClass)->toggleEnabled();
-        app(ResourceDiscoveryService::class)->flush();
-        $this->reinitialize();
+        $this->docsPublic = ! $this->docsPublic;
+        ApiForgeGlobalSetting::set('docs_public', $this->docsPublic);
+
+        if ($this->docsPublic) {
+            Notification::make()
+                ->title('Docs published')
+                ->body(route('api-forge.docs.public'))
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Docs unpublished')
+                ->warning()
+                ->send();
+        }
     }
 
-    public function toggleMethod(string $resourceClass, string $method): void
+    protected function getHeaderActions(): array
     {
-        ApiForgeResourceSetting::forResource($resourceClass)->toggleMethod($method);
-        app(ResourceDiscoveryService::class)->flush();
-        $this->reinitialize();
-    }
+        return [
+            Action::make('publishDocs')
+                ->label(fn () => $this->docsPublic ? 'Unpublish Docs' : 'Publish Docs')
+                ->icon(fn () => $this->docsPublic ? 'heroicon-o-eye-slash' : 'heroicon-o-globe-alt')
+                ->color(fn () => $this->docsPublic ? 'danger' : 'success')
+                ->action('togglePublicDocs'),
 
-    public function saveResourceSettings(string $resourceClass, ?int $rateLimit, string $allowedIps): void
-    {
-        $ips = array_values(array_filter(array_map('trim', explode("\n", $allowedIps))));
-        ApiForgeResourceSetting::forResource($resourceClass)->saveSettings($rateLimit ?: null, $ips);
-        $this->loadResourceStates();
-
-        Notification::make()->title('Resource settings saved')->success()->send();
-    }
-
-    public function saveMethodSettings(string $resourceClass, string $method, ?int $rateLimit, string $allowedIps): void
-    {
-        $ips = array_values(array_filter(array_map('trim', explode("\n", $allowedIps))));
-        ApiForgeResourceSetting::forResource($resourceClass)->saveMethodConfig($method, $rateLimit ?: null, $ips);
-        $this->loadResourceStates();
-
-        Notification::make()->title('Method settings saved')->success()->send();
+            Action::make('copyPublicUrl')
+                ->label('Copy Public URL')
+                ->icon('heroicon-o-clipboard-document')
+                ->color('gray')
+                ->visible(fn () => $this->docsPublic)
+                ->action(function () {
+                    Notification::make()
+                        ->title('Public URL')
+                        ->body(route('api-forge.docs.public'))
+                        ->info()
+                        ->persistent()
+                        ->send();
+                }),
+        ];
     }
 
     private function reinitialize(): void
@@ -141,7 +153,6 @@ class ApiDocumentation extends Page
             }
         }
         $this->groupedEndpoints = $grouped;
-        $this->loadResourceStates();
 
         if ($this->selectedEndpointId) {
             $found = false;
@@ -252,73 +263,6 @@ class ApiDocumentation extends Page
             'DELETE'       => 'danger',
             default        => 'gray',
         };
-    }
-
-    private function loadResourceStates(): void
-    {
-        $settings = ApiForgeResourceSetting::all()->keyBy('resource_class');
-
-        $this->resourceStates = [];
-
-        foreach (filament()->getPanels() as $panel) {
-            foreach ($panel->getResources() as $resourceClass) {
-                if (! is_subclass_of($resourceClass, HasApi::class)) {
-                    continue;
-                }
-
-                $setting    = $settings->get($resourceClass);
-                $tag        = $this->resolveResourceTag($resourceClass);
-                $apiConfig  = $resourceClass::apiConfig();
-                $allMethods = $apiConfig['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
-
-                $disabledMethods = $setting ? ($setting->disabled_methods ?? []) : [];
-
-                // Per-method settings
-                $methodSettings = [];
-                foreach ($allMethods as $m) {
-                    $mc = $setting ? $setting->getMethodConfig($m) : [];
-                    $methodSettings[$m] = [
-                        'rate_limit'  => $mc['rate_limit'] ?? null,
-                        'allowed_ips' => $mc['allowed_ips'] ?? [],
-                    ];
-                }
-
-                $this->resourceStates[$resourceClass] = [
-                    'enabled'          => $setting ? $setting->enabled : true,
-                    'tag'              => $tag,
-                    'allowed_methods'  => $allMethods,
-                    'disabled_methods' => $disabledMethods,
-                    'rate_limit'       => $setting?->rate_limit,
-                    'allowed_ips'      => $setting?->allowed_ips ?? [],
-                    'method_settings'  => $methodSettings,
-                    'model_fields'     => $this->resolveModelFields($resourceClass),
-                    'api_config'       => $apiConfig,
-                ];
-            }
-        }
-    }
-
-    private function resolveResourceTag(string $resourceClass): string
-    {
-        $ref   = new \ReflectionClass($resourceClass);
-        $attrs = $ref->getAttributes(ApiTag::class);
-
-        if (! empty($attrs)) {
-            return $attrs[0]->newInstance()->name;
-        }
-
-        return $resourceClass::getPluralModelLabel();
-    }
-
-    private function resolveModelFields(string $resourceClass): array
-    {
-        try {
-            $modelClass = $resourceClass::getModel();
-            $model      = new $modelClass();
-            return $model->getFillable();
-        } catch (\Throwable) {
-            return [];
-        }
     }
 
     private function resolveResponses(array $responses): array

@@ -119,6 +119,18 @@ return [
     | Configure how the plugin appears in the Filament panel navigation.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Route Segment
+    |--------------------------------------------------------------------------
+    |
+    | The URL segment used in API paths instead of the panel ID.
+    | Example: 'filament' → GET /api/v1/filament/posts
+    | Leave null to use the panel ID (default behavior).
+    |
+    */
+    'route_segment' => env('API_FORGE_ROUTE_SEGMENT', null),
+
     'navigation' => [
         'group' => 'Developer Center',
         'icon' => 'heroicon-o-code-bracket-square',

@@ -64,9 +64,17 @@ class ResourceDiscoveryService
 
     public function findResource(string $panelId, string $slug): ?array
     {
-        return $this->discover()->first(function (array $resource) use ($panelId, $slug) {
+        // Try exact panel match first
+        $resource = $this->discover()->first(function (array $resource) use ($panelId, $slug) {
             return $resource['panel_id'] === $panelId && $resource['slug'] === $slug;
         });
+
+        // If no exact panel match, search by slug across all panels (supports custom route segments)
+        if (! $resource) {
+            $resource = $this->discover()->first(fn (array $r) => $r['slug'] === $slug);
+        }
+
+        return $resource;
     }
 
     public function getResourcesForPanel(string $panelId): Collection

@@ -5,9 +5,11 @@ namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
 use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
 use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -17,6 +19,17 @@ class ApiDocumentationController extends Controller
     public function __construct(
         protected ResourceDiscoveryService $discoveryService,
     ) {}
+
+    public function publicDocs(): Response
+    {
+        if (! ApiForgeGlobalSetting::get('docs_public', false)) {
+            abort(403, 'API documentation is not publicly available.');
+        }
+
+        $openApiUrl = route('api-forge.docs.openapi');
+
+        return response()->view('filament-api-forge::public-docs', compact('openApiUrl'));
+    }
 
     public function openApiSpec(Request $request): JsonResponse
     {
@@ -55,8 +68,10 @@ class ApiDocumentationController extends Controller
 
             $schemas[$schemaName] = $this->buildSchema($model);
 
-            $base = "/{$panelId}/{$slug}";
-            $item = "/{$panelId}/{$slug}/{id}";
+            // Use configured route segment if set, otherwise fall back to panel ID
+            $routeSegment = ApiForgeGlobalSetting::get('route_segment') ?? $panelId;
+            $base = "/{$routeSegment}/{$slug}";
+            $item = "/{$routeSegment}/{$slug}/{id}";
             $sec  = [['sanctum' => []]];
 
             // ── Collection endpoints: GET /resource  POST /resource ───────

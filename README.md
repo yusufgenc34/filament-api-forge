@@ -1,6 +1,6 @@
 # Filament API Forge
 
-Automatically expose your **Filament Resources** as fully-featured REST APIs — with hash-based authentication, OpenAPI documentation, per-resource access control, rate limiting, and IP restrictions. No Sanctum required.
+Automatically expose your **Filament Resources** as fully-featured REST APIs — with hash-based authentication, interactive OpenAPI documentation, per-resource access control, rate limiting, and IP restrictions. No Sanctum required.
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/yusufgenc/filament-api-forge.svg?style=flat-square)](https://packagist.org/packages/yusufgenc/filament-api-forge)
 [![PHP Version](https://img.shields.io/badge/PHP-8.2%2B-blue.svg?style=flat-square)](https://www.php.net)
@@ -9,20 +9,39 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 
 ---
 
+## Screenshots
+
+| Developer Center | API Keys | API Docs |
+|:-:|:-:|:-:|
+| ![Dashboard](screenshots/dashboard.png) | ![API Keys](screenshots/api-keys.png) | ![API Docs](screenshots/api-docs.png) |
+
+| Access Control | Settings |
+|:-:|:-:|
+| ![Access Control](screenshots/access-control.png) | ![Settings](screenshots/settings.png) |
+
+| Public Docs (Light) | Public Docs (Dark) |
+|:-:|:-:|
+| ![Public Docs Light](screenshots/public-docs-light.png) | ![Public Docs Dark](screenshots/public-docs-dark.png) |
+
+---
+
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **Auto-Discovery** | Automatically detects any Resource implementing `HasApi` — zero manual route registration |
+| **Auto-Discovery** | Detects any Resource implementing `HasApi` — zero manual route registration |
 | **Hash-Based Auth** | `forge_` prefix tokens (SHA-256 hashed at rest), Stripe/OpenAI style |
 | **CRUD Endpoints** | `index`, `show`, `store`, `update`, `destroy` — enable only what you need |
 | **Spatie Query Builder** | Filtering, sorting, field selection, eager loading, full-text search out of the box |
 | **Scope Enforcement** | Per-token `read` / `write` / `delete` scopes, plus `*` for full access |
-| **Access Control UI** | Enable/disable individual methods or entire resources from the Filament panel |
-| **Rate Limiting** | Global, per-resource, and per-method rate limits — enforced via middleware |
+| **Access Control** | Dedicated panel page — enable/disable methods or entire resources, set rate limits and IP rules |
+| **Rate Limiting** | Global, per-resource, and per-method limits — method overrides resource, resource overrides global |
 | **IP Restrictions** | Whitelist IPs per resource or per method (CIDR, wildcard, exact) |
-| **OpenAPI Docs** | Dynamically generated OpenAPI 3.0 spec + Stoplight Elements UI |
-| **Developer Center** | Dashboard, API key management, and documentation embedded in your panel |
+| **OpenAPI Docs** | Dynamically generated OpenAPI 3.0 spec with interactive Swagger UI |
+| **Public Docs** | Publish your API docs to a standalone public URL with a single click — light/dark mode included |
+| **Route Segment** | Replace the panel ID in API paths with a custom segment (e.g. `/filament/posts`) |
+| **Request Counters** | Per-token request count tracking with abbreviated display (1K, 2.4M) and one-click reset |
+| **Developer Center** | Dashboard, API key management, documentation, access control, and settings — all in one panel group |
 
 ---
 
@@ -70,8 +89,8 @@ public function panel(Panel $panel): Panel
     return $panel
         ->plugin(
             FilamentApiForgePlugin::make()
-                ->apiKeys()     // API key management page
-                ->docs()        // OpenAPI documentation page
+                ->apiKeys()     // API key management
+                ->docs()        // API Docs + Access Control + Settings pages
                 ->dashboard()   // Developer Center dashboard
         );
 }
@@ -82,7 +101,7 @@ All three are enabled by default. You can disable any section:
 ```php
 FilamentApiForgePlugin::make()
     ->apiKeys()
-    ->docs(false)       // hide the docs page
+    ->docs(false)       // hide docs, access control, and settings pages
     ->dashboard(false)  // hide the dashboard
 ```
 
@@ -105,10 +124,10 @@ class PostResource extends Resource implements HasApi
             'allowed_fields'    => ['id', 'title', 'slug', 'body', 'status', 'published_at'],
             'searchable'        => ['title', 'body'],
             'scopes'            => ['read', 'write', 'delete'],
-            'validation_rules'  => [           // optional — overrides auto-detected rules
-                'title' => ['required', 'string', 'max:255'],
-                'body'  => ['required', 'string'],
-                'status'=> ['required', 'in:draft,published,archived'],
+            'validation_rules'  => [
+                'title'  => ['required', 'string', 'max:255'],
+                'body'   => ['required', 'string'],
+                'status' => ['required', 'in:draft,published,archived'],
             ],
         ];
     }
@@ -119,45 +138,41 @@ class PostResource extends Resource implements HasApi
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `allowed_methods` | `string[]` | Which CRUD operations to expose: `index`, `show`, `store`, `update`, `destroy` |
+| `allowed_methods` | `string[]` | CRUD operations to expose: `index`, `show`, `store`, `update`, `destroy` |
 | `allowed_filters` | `string[]` | Columns clients can filter by (`?filter[title]=foo`) |
 | `allowed_sorts` | `string[]` | Columns clients can sort by (`?sort=-created_at`) |
-| `allowed_includes` | `string[]` | Eloquent relations clients can eager-load (`?include=author`) |
+| `allowed_includes` | `string[]` | Eloquent relations to eager-load (`?include=author`) |
 | `allowed_fields` | `string[]` | Columns clients can select (`?fields[posts]=id,title`) |
-| `searchable` | `string[]` | Columns searched when `?search=query` is provided |
-| `scopes` | `string[]` | Scopes a token must have to call this resource (`read`, `write`, `delete`) |
-| `validation_rules` | `array` | Explicit validation rules for `store`/`update`. Falls back to `allowed_fields` → `$fillable` |
+| `searchable` | `string[]` | Columns searched via `?search=query` |
+| `scopes` | `string[]` | Required token scopes: `read`, `write`, `delete` |
+| `validation_rules` | `array` | Explicit rules for `store`/`update`. Falls back to `allowed_fields` → `$fillable` |
 
 ### 3. Enrich the OpenAPI Docs (optional)
 
-Decorate your Resource class with attributes to improve generated documentation:
+Decorate your Resource class with PHP 8 attributes to improve generated documentation:
 
 ```php
 use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
 use YusufGenc34\FilamentApiForge\Attributes\ApiDescription;
 use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
+use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
 
 #[ApiTag('Posts')]
 #[ApiDescription('Manage blog posts and articles.')]
 #[ApiOperations(
     index:   'List all posts with filtering and sorting',
-    show:    'Retrieve a single post by ID',
     store:   ['summary' => 'Create a post', 'description' => 'Requires **write** scope.'],
-    update:  ['summary' => 'Update a post', 'description' => 'Partial updates via PATCH.'],
     destroy: ['summary' => 'Delete a post', 'description' => 'Requires **delete** scope.'],
 )]
-class PostResource extends Resource implements HasApi
-{
-    // ...
-}
+class PostResource extends Resource implements HasApi { ... }
 ```
 
 | Attribute | Description |
 |-----------|-------------|
-| `#[ApiTag('Name')]` | Groups endpoints under a tag in the OpenAPI spec |
-| `#[ApiDescription('...')]` | Sets the resource description in the docs |
+| `#[ApiTag('Name')]` | Groups endpoints under a named tag in the OpenAPI spec |
+| `#[ApiDescription('...')]` | Sets the resource description |
 | `#[ApiOperations(...)]` | Per-method summaries and descriptions |
-| `#[ApiIgnore]` | Excludes the resource from the OpenAPI spec entirely |
+| `#[ApiIgnore]` | Excludes the resource from the spec entirely |
 
 ---
 
@@ -172,11 +187,7 @@ curl -H "Authorization: Bearer forge_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### Token Format
 
-Tokens use the `forge_` prefix followed by 40 random characters (238 bits of entropy). The **plain-text token is shown only once** at creation time — only a SHA-256 hash is stored in the database.
-
-```
-forge_<40-char random>
-```
+Tokens use the `forge_` prefix followed by 40 random characters (238 bits of entropy). The plain-text token is shown **once** at creation — only its SHA-256 hash is stored.
 
 ### Scopes
 
@@ -185,9 +196,9 @@ forge_<40-char random>
 | `read` | `GET` (index, show) |
 | `write` | `POST`, `PUT`, `PATCH` (store, update) |
 | `delete` | `DELETE` (destroy) |
-| `*` | Full access — all of the above |
+| `*` | Full access |
 
-Tokens can also be restricted to specific resources by setting **Resource Access** when creating them.
+Tokens can also be restricted to specific resources via **Resource Access** in the API Keys page.
 
 ---
 
@@ -196,53 +207,31 @@ Tokens can also be restricted to specific resources by setting **Resource Access
 The base URL pattern is:
 
 ```
-{APP_URL}/api/v1/{panel_id}/{resource_slug}
+{APP_URL}/api/v1/{segment}/{resource_slug}
 ```
 
-### List resources
+Where `{segment}` is the panel ID (`admin`) by default, or a [custom route segment](#route-segment) if configured.
+
+### Examples
 
 ```bash
-GET /api/v1/admin/posts
-```
+# List with filtering, sorting, and pagination
+GET /api/v1/admin/posts?filter[status]=published&sort=-created_at&per_page=25
 
-```bash
-# With filtering, sorting, includes, and pagination
-GET /api/v1/admin/posts?filter[status]=published&sort=-created_at&include=author&per_page=25
-```
-
-### Get a single record
-
-```bash
+# Single record
 GET /api/v1/admin/posts/1
-```
 
-### Create a record
-
-```bash
+# Create
 POST /api/v1/admin/posts
 Content-Type: application/json
+{"title": "Hello World", "body": "...", "status": "draft"}
 
-{
-  "title": "Hello World",
-  "body": "Article body here...",
-  "status": "draft"
-}
-```
-
-### Update a record
-
-```bash
+# Update
 PUT /api/v1/admin/posts/1
 Content-Type: application/json
+{"status": "published"}
 
-{
-  "status": "published"
-}
-```
-
-### Delete a record
-
-```bash
+# Delete
 DELETE /api/v1/admin/posts/1
 ```
 
@@ -251,62 +240,17 @@ DELETE /api/v1/admin/posts/1
 | Parameter | Example | Description |
 |-----------|---------|-------------|
 | `filter[field]` | `?filter[status]=published` | Filter by field value (partial match) |
-| `sort` | `?sort=-created_at` | Sort ascending or descending (prefix `-`) |
+| `sort` | `?sort=-created_at` | Sort ascending or descending (prefix `-` for desc) |
 | `include` | `?include=author,category` | Eager-load relations |
-| `fields[resource]` | `?fields[posts]=id,title` | Select specific fields |
+| `fields[resource]` | `?fields[posts]=id,title` | Sparse fieldsets |
 | `search` | `?search=laravel` | Full-text search across `searchable` columns |
-| `per_page` | `?per_page=50` | Results per page (max defined in config) |
-
----
-
-## Access Control
-
-The **Access Control** tab in the Developer Center lets you manage per-resource settings without touching code.
-
-### Enable / Disable a Resource
-
-Toggle the entire resource on or off. When disabled, all requests return `404`.
-
-### Enable / Disable Individual Methods
-
-Toggle specific HTTP methods per resource. Disabled methods return `405`.
-
-### Rate Limiting
-
-Set a request limit (requests per minute) at the resource level or per method. Method-level limits override resource-level limits.
-
-```
-Resource: 60 req/min  →  applies to all methods
-Method (index): 10 req/min  →  overrides resource limit for GET /resource
-```
-
-Rate limit responses return HTTP `429` with headers:
-
-```
-X-RateLimit-Limit: 10
-X-RateLimit-Remaining: 0
-Retry-After: 47
-```
-
-### IP Restrictions
-
-Whitelist allowed IP addresses at the resource or method level. Supports:
-
-| Format | Example |
-|--------|---------|
-| Exact IP | `192.168.1.100` |
-| CIDR range | `10.0.0.0/8` |
-| Wildcard | `192.168.1.*` |
-
-Blocked requests return HTTP `403`.
+| `per_page` | `?per_page=50` | Results per page (capped by `max_per_page` config) |
 
 ---
 
 ## Response Format
 
-All responses follow a consistent JSON structure.
-
-### Collection (index)
+### Collection (`index`)
 
 ```json
 {
@@ -314,10 +258,10 @@ All responses follow a consistent JSON structure.
     { "id": 1, "title": "Hello World", "status": "published" }
   ],
   "links": {
-    "first": "https://yourapp.com/api/v1/admin/posts?page=1",
-    "last":  "https://yourapp.com/api/v1/admin/posts?page=5",
+    "first": "/api/v1/admin/posts?page=1",
+    "last":  "/api/v1/admin/posts?page=5",
     "prev":  null,
-    "next":  "https://yourapp.com/api/v1/admin/posts?page=2"
+    "next":  "/api/v1/admin/posts?page=2"
   },
   "meta": {
     "current_page": 1,
@@ -330,7 +274,7 @@ All responses follow a consistent JSON structure.
 }
 ```
 
-### Single record (show / store / update)
+### Single record (`show` / `store` / `update`)
 
 ```json
 {
@@ -350,11 +294,86 @@ All responses follow a consistent JSON structure.
 | `401` | `unauthenticated` | Missing or invalid token |
 | `403` | `insufficient_scope` | Token lacks required scope |
 | `403` | `resource_not_allowed` | Token restricted to other resources |
-| `403` | `ip_not_allowed` | Client IP is not whitelisted |
+| `403` | `ip_forbidden` | Client IP is not whitelisted |
 | `404` | `not_found` | Resource or record not found / disabled |
 | `405` | `method_not_allowed` | Method is disabled for this resource |
 | `422` | _(validation)_ | Request data failed validation |
 | `429` | `rate_limit_exceeded` | Too many requests |
+
+---
+
+## Developer Center
+
+The Developer Center is embedded in your Filament panel under the **Developer Center** navigation group.
+
+| Page | URL | Description |
+|------|-----|-------------|
+| **Dashboard** | `/admin/developer/dashboard` | Stats overview (resources, endpoints, tokens, total requests with abbreviated counts), resource list, and quick-start examples |
+| **API Keys** | `/admin/developer/api-keys` | Create, inspect, and revoke tokens with scope and resource restrictions |
+| **API Docs** | `/admin/developer/api-docs` | Interactive OpenAPI documentation with try-it-out panel and Publish Docs button |
+| **Access Control** | `/admin/developer/access-control` | Enable/disable resources and individual methods; set rate limits and IP whitelists per resource or method |
+| **Settings** | `/admin/developer/settings` | Configure route segment, view route preview, and reset request counters |
+
+---
+
+## Access Control
+
+The **Access Control** page lets you manage per-resource settings without touching code.
+
+- **Enable / Disable a Resource** — toggle the resource on or off. Disabled resources return `404`.
+- **Enable / Disable Methods** — toggle specific HTTP methods. Disabled methods return `405`.
+- **Rate Limiting** — set limits at resource or method level. Method limits override resource limits, which override the global config value.
+- **IP Restrictions** — whitelist IPs at resource or method level. Supports exact IPs, CIDR ranges (`10.0.0.0/8`), and wildcards (`192.168.1.*`).
+
+---
+
+## Public API Docs
+
+The **Publish Docs** button on the API Docs page makes your documentation available at a public URL — no login required:
+
+```
+GET /api/v1/docs
+```
+
+The page uses Swagger UI with full light/dark mode support (default light, toggle persisted in `localStorage`). When unpublished, the URL returns `403`.
+
+The **Copy Public URL** button (visible when published) shows the URL in a notification for easy copying.
+
+---
+
+## Route Segment
+
+By default, API paths include the Filament panel ID:
+
+```
+/api/v1/admin/posts
+```
+
+You can replace `admin` with any custom segment from **Developer Center → Settings**, or via environment variable:
+
+```env
+API_FORGE_ROUTE_SEGMENT=filament
+```
+
+Result:
+
+```
+/api/v1/filament/posts
+```
+
+> **Note:** Both the original panel-ID paths and the new segment work simultaneously — no breaking changes to existing integrations.
+
+The Settings page shows a live **Route Preview** table so you can see exactly how paths will appear in the docs before saving.
+
+---
+
+## Request Counters
+
+Every API call increments the `request_count` on the token used. The Dashboard displays the all-time total with abbreviated formatting (`1.2K`, `3.5M`, `2.1B` — hover for exact value).
+
+From **Settings → Request Counters** you can:
+- See per-token counts (top 10 by usage, with last-used time)
+- Reset all counters to zero with a single click (useful after testing or a new release)
 
 ---
 
@@ -364,16 +383,30 @@ All responses follow a consistent JSON structure.
 // config/filament-api-forge.php
 
 return [
-    'api_prefix'  => 'api/v1',
-    'api_version' => 'v1',
+    'api_prefix'     => env('API_FORGE_PREFIX', 'api/v1'),
+    'api_version'    => env('API_FORGE_VERSION', 'v1'),
+    'rate_limit'     => env('API_FORGE_RATE_LIMIT', 60),  // global req/min
+
+    // Custom URL segment to replace the panel ID in API paths
+    // null = use panel ID (default)
+    'route_segment'  => env('API_FORGE_ROUTE_SEGMENT', null),
 
     'auth' => [
-        'enabled' => true,   // set false to disable auth entirely (dev only)
+        'enabled'                 => true,
+        'default_expiration_days' => 365,
+    ],
+
+    'docs' => [
+        'enabled'     => true,
+        'title'       => 'API Documentation',
+        'description' => 'Auto-generated API documentation for Filament resources.',
+        'theme'       => 'dark',
     ],
 
     'discovery' => [
-        'middleware' => ['api'],
-        'panels'     => [],  // restrict discovery to specific panels, empty = all
+        'auto_discover'   => true,
+        'allowed_methods' => ['index', 'show', 'store', 'update', 'destroy'],
+        'middleware'      => ['api'],
     ],
 
     'pagination' => [
@@ -381,24 +414,14 @@ return [
         'max_per_page'     => 100,
     ],
 
-    'rate_limiting' => [
-        'enabled'           => true,
-        'requests_per_minute' => 60,
+    'query_builder' => [
+        'enable_filters'  => true,
+        'enable_sorts'    => true,
+        'enable_includes' => true,
+        'enable_fields'   => true,
     ],
 ];
 ```
-
----
-
-## Developer Center
-
-The Developer Center is automatically embedded in your Filament panel under the **Developer Center** navigation group.
-
-| Page | URL | Description |
-|------|-----|-------------|
-| Dashboard | `/admin/developer/dashboard` | Stats, resource list, endpoint reference, quick-start curl examples |
-| API Keys | `/admin/developer/api-keys` | Create, view and revoke tokens |
-| API Docs | `/admin/developer/api-docs` | Interactive OpenAPI documentation (Stoplight Elements) |
 
 ---
 
