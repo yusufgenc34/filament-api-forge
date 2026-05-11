@@ -11,17 +11,26 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 
 ## Screenshots
 
-| Developer Center | API Keys | API Docs |
-|:-:|:-:|:-:|
-| ![Dashboard](screenshots/dashboard.png) | ![API Keys](screenshots/api-keys.png) | ![API Docs](screenshots/api-docs.png) |
+**Developer Center**
+![Dashboard](screenshots/dashboard.png)
 
-| Access Control | Settings |
-|:-:|:-:|
-| ![Access Control](screenshots/access-control.png) | ![Settings](screenshots/settings.png) |
+**API Keys**
+![API Keys](screenshots/api-keys.png)
 
-| Public Docs (Light) | Public Docs (Dark) |
-|:-:|:-:|
-| ![Public Docs Light](screenshots/public-docs-light.png) | ![Public Docs Dark](screenshots/public-docs-dark.png) |
+**API Docs**
+![API Docs](screenshots/api-docs.png)
+
+**Access Control**
+![Access Control](screenshots/access-control.png)
+
+**Settings**
+![Settings](screenshots/settings.png)
+
+**Public Docs — Light Mode**
+![Public Docs Light](screenshots/public-docs-light.png)
+
+**Public Docs — Dark Mode**
+![Public Docs Dark](screenshots/public-docs-dark.png)
 
 ---
 
