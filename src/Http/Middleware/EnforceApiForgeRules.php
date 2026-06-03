@@ -89,6 +89,12 @@ class EnforceApiForgeRules
 
     private function resolveAction(Request $request): string
     {
+        // Custom action detection
+        $actionName = $request->route('actionName');
+        if ($actionName) {
+            return 'action.' . $actionName;
+        }
+
         $method = strtoupper($request->method());
 
         return match (true) {

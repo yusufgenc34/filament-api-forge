@@ -1,6 +1,6 @@
 {
     "name": "yusufgenc/filament-api-forge",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Automatically expose your Filament Resources as fully-featured REST APIs with authentication, documentation, rate limiting and query builder support.",
     "keywords": [
         "filament",
@@ -27,6 +27,9 @@
         "illuminate/contracts": "^12.0|^13.0",
         "spatie/laravel-package-tools": "^1.16",
         "spatie/laravel-query-builder": "^5.0|^6.0"
+    },
+    "suggest": {
+        "spatie/laravel-medialibrary": "Required for file/media upload support in API endpoints via Spatie Media Library."
     },
     "require-dev": {
         "orchestra/testbench": "^9.0|^10.0",
@@ -56,5 +59,10 @@
         }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
 }

@@ -57,27 +57,67 @@
 
     @if(!empty($selectedEndpoint['operation']['requestBody']))
         @php
-            $bodyRef    = $selectedEndpoint['operation']['requestBody']['content']['application/json']['schema']['$ref'] ?? '';
-            $bodyName   = str_replace('#/components/schemas/', '', $bodyRef);
-            $bodySchema = $schemas[$bodyName] ?? null;
+            $reqContent = $selectedEndpoint['operation']['requestBody']['content'] ?? [];
+            $isMultipart = isset($reqContent['multipart/form-data']);
+            $isJson      = isset($reqContent['application/json']);
+
+            if ($isMultipart) {
+                $bodySchema = $reqContent['multipart/form-data']['schema'] ?? [];
+            } elseif ($isJson) {
+                $bodyRef    = $reqContent['application/json']['schema']['$ref'] ?? '';
+                $bodyName   = str_replace('#/components/schemas/', '', $bodyRef);
+                $bodySchema = $schemas[$bodyName] ?? null;
+            }
         @endphp
-        <span class="sec-label">Request Body @if($bodyName)<span style="font-family:monospace;font-size:.7rem;color:var(--dv-accent);text-transform:none;letter-spacing:0;font-weight:400;margin-left:.3rem;">{{ $bodyName }}</span>@endif</span>
-        @if($bodySchema)
+
+        @if($isMultipart)
+            @php $bodyTypeLabel = 'multipart/form-data'; @endphp
+        @elseif($isJson && $bodyName)
+            @php $bodyTypeLabel = 'application/json · ' . $bodyName; @endphp
+        @else
+            @php $bodyTypeLabel = ''; @endphp
+        @endif
+
+        <span class="sec-label">Request Body <span style="font-family:monospace;font-size:.7rem;color:var(--dv-accent);text-transform:none;letter-spacing:0;font-weight:400;margin-left:.3rem;">{{ $bodyTypeLabel }}</span></span>
+
+        @if(!empty($bodySchema['properties']))
             <table class="ptbl">
                 <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
                 <tbody>
-                    @foreach($bodySchema['properties'] ?? [] as $prop => $def)
+                    @foreach($bodySchema['properties'] as $prop => $def)
+                        @php $isFile = ($def['format'] ?? '') === 'binary'; @endphp
                         <tr>
-                            <td><span class="pname">{{ $prop }}</span></td>
-                            <td><span class="ptype">{{ $def['type'] ?? 'string' }}@if(isset($def['format'])) · {{ $def['format'] }}@endif</span></td>
-                            <td>@if($def['readOnly'] ?? false)<span style="color:#ef4444;font-size:.7rem;">read-only</span>@endif</td>
+                            <td><span class="pname">{{ $prop }}</span>@if($isFile)<span class="req-tag" style="background:var(--dv-accent);">file</span>@endif</td>
+                            <td>
+                                <span class="ptype">
+                                    @if($isFile)
+                                        📁 {{ $def['type'] === 'array' ? 'file[]' : 'file' }}
+                                    @else
+                                        {{ $def['type'] ?? 'string' }}@if(isset($def['format']) && !$isFile) · {{ $def['format'] }}@endif
+                                    @endif
+                                </span>
+                            </td>
+                            <td>
+                                @if($def['readOnly'] ?? false)<span style="color:#ef4444;font-size:.7rem;">read-only</span>@endif
+                                @if(isset($def['description']))<span style="color:var(--dv-muted);font-size:.7rem;display:block;">{{ $def['description'] }}</span>@endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-            @php $exBody = collect($bodySchema['properties'] ?? [])->filter(fn($d) => !($d['readOnly'] ?? false))->mapWithKeys(fn($d, $k) => [$k => exVal($d)])->toArray(); @endphp
+            @php
+                $exBody = collect($bodySchema['properties'] ?? [])
+                    ->filter(fn($d) => !($d['readOnly'] ?? false))
+                    ->mapWithKeys(function($d, $k) {
+                        $isFile = ($d['format'] ?? '') === 'binary';
+                        return [$k => $isFile ? ($d['type'] === 'array' ? ['<file1>','<file2>'] : '<file>') : exVal($d)];
+                    })
+                    ->toArray();
+            @endphp
             <div style="margin-top:.75rem;">
-                <span style="font-size:.6rem;color:var(--dv-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Example JSON</span>
+                <span style="font-size:.6rem;color:var(--dv-faint);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">
+                    {{ $isMultipart ? 'Form Fields Example' : 'Example JSON' }}
+                </span>
                 <pre class="codeblock" style="margin-top:.35rem;">{!! jt($exBody) !!}</pre>
             </div>
         @endif

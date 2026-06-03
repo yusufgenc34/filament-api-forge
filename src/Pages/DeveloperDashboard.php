@@ -2,8 +2,11 @@
 
 namespace YusufGenc34\FilamentApiForge\Pages;
 
+use YusufGenc34\FilamentApiForge\Contracts\HasApi;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
 
@@ -18,6 +21,7 @@ class DeveloperDashboard extends Page
     protected string $view = 'filament-api-forge::developer-dashboard';
 
     public array  $apiResources    = [];
+    public array  $treeResources   = [];
     public int    $resourceCount   = 0;
     public int    $totalEndpoints  = 0;
     public int    $activeTokens    = 0;
@@ -41,18 +45,64 @@ class DeveloperDashboard extends Page
         $this->apiBaseUrl     = url(config('filament-api-forge.api_prefix', 'api/v1'));
         $this->apiVersion     = config('filament-api-forge.api_version', 'v1');
 
-        // Count all enabled endpoints across all resources
         $this->totalEndpoints = $resources->sum(
             fn ($r) => count($r['api_config']['allowed_methods'] ?? [])
         );
 
-        // Token stats
-        $this->activeTokens   = ApiForgeToken::where('is_active', true)
+        $this->activeTokens = ApiForgeToken::where('is_active', true)
             ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->count();
 
         $this->totalRequests          = (int) ApiForgeToken::sum('request_count');
         $this->formattedTotalRequests = self::abbreviateCount($this->totalRequests);
+
+        $this->treeResources = $this->discoverAllForTree();
+    }
+
+    protected function discoverAllForTree(): array
+    {
+        $allMethods = config(
+            'filament-api-forge.discovery.allowed_methods',
+            ['index', 'show', 'store', 'update', 'destroy']
+        );
+
+        $settings = ApiForgeResourceSetting::all()->keyBy('resource_class');
+        $tree     = [];
+
+        foreach (Filament::getPanels() as $panel) {
+            $panelId = $panel->getId();
+
+            foreach ($panel->getResources() as $resourceClass) {
+                if (! is_subclass_of($resourceClass, HasApi::class)) {
+                    continue;
+                }
+
+                $setting         = $settings->get($resourceClass);
+                $enabled         = ! $setting || $setting->enabled;
+                $apiConfig       = $resourceClass::apiConfig();
+                $configMethods   = $apiConfig['allowed_methods'] ?? $allMethods;
+                $disabledMethods = $setting ? ($setting->disabled_methods ?? []) : [];
+
+                $methods = [];
+                foreach ($configMethods as $method) {
+                    $methods[] = [
+                        'method'   => $method,
+                        'disabled' => in_array($method, $disabledMethods),
+                    ];
+                }
+
+                $tree[] = [
+                    'resource_class' => $resourceClass,
+                    'slug'           => $resourceClass::getSlug(),
+                    'panel_id'       => $panelId,
+                    'plural_label'   => $resourceClass::getPluralModelLabel(),
+                    'enabled'        => $enabled,
+                    'methods'        => $methods,
+                ];
+            }
+        }
+
+        return $tree;
     }
 
     public static function abbreviateCount(int $n): string

@@ -67,6 +67,8 @@ class ApiDocumentationController extends Controller
             $ops    = $this->readAttribute($resourceClass, ApiOperations::class);
 
             $schemas[$schemaName] = $this->buildSchema($model);
+            $hasUploads = ! empty($res['api_config']['uploads'] ?? []);
+            $uploads    = $res['api_config']['uploads'] ?? [];
 
             // Use configured route segment if set, otherwise fall back to panel ID
             $routeSegment = ApiForgeGlobalSetting::get('route_segment') ?? $panelId;
@@ -108,22 +110,28 @@ class ApiDocumentationController extends Controller
             }
 
             if (in_array('store', $allowed)) {
+                // Build the response schema — add _uploads if resource has file fields
+                $storeResponseProps = ['data' => ['$ref' => "#/components/schemas/{$schemaName}"]];
+                if ($hasUploads) {
+                    $storeResponseProps['_uploads'] = $this->uploadResponseSchema($uploads);
+                }
+
                 $op = [
                     'tags'        => [$plural],
                     'summary'     => $ops?->getSummary('store') ?? "Create {$label}",
                     'operationId' => 'create' . Str::studly($label),
-                    'requestBody' => [
-                        'required' => true,
-                        'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
-                    ],
+                    'requestBody' => $hasUploads
+                        ? $this->multipartRequestBody($schemaName, $model, $uploads)
+                        : [
+                            'required' => true,
+                            'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
+                        ],
                     'responses' => [
                         '201' => [
                             'description' => "The created {$label}.",
                             'content'     => ['application/json' => ['schema' => [
                                 'type'       => 'object',
-                                'properties' => [
-                                    'data' => ['$ref' => "#/components/schemas/{$schemaName}"],
-                                ],
+                                'properties' => $storeResponseProps,
                             ]]],
                         ],
                         '422' => ['$ref' => '#/components/responses/ValidationError'],
@@ -177,23 +185,28 @@ class ApiDocumentationController extends Controller
             }
 
             if (in_array('update', $allowed)) {
+                $updateResponseProps = ['data' => ['$ref' => "#/components/schemas/{$schemaName}"]];
+                if ($hasUploads) {
+                    $updateResponseProps['_uploads'] = $this->uploadResponseSchema($uploads);
+                }
+
                 $op = [
                     'tags'        => [$plural],
                     'summary'     => $ops?->getSummary('update') ?? "Update {$label}",
                     'operationId' => 'update' . Str::studly($label),
                     'parameters'  => [$idParam],
-                    'requestBody' => [
-                        'required' => true,
-                        'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
-                    ],
+                    'requestBody' => $hasUploads
+                        ? $this->multipartRequestBody($schemaName, $model, $uploads)
+                        : [
+                            'required' => true,
+                            'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
+                        ],
                     'responses' => [
                         '200' => [
                             'description' => "The updated {$label}.",
                             'content'     => ['application/json' => ['schema' => [
                                 'type'       => 'object',
-                                'properties' => [
-                                    'data' => ['$ref' => "#/components/schemas/{$schemaName}"],
-                                ],
+                                'properties' => $updateResponseProps,
                             ]]],
                         ],
                         '422' => ['$ref' => '#/components/responses/ValidationError'],
@@ -431,5 +444,124 @@ class ApiDocumentationController extends Controller
     protected function hasAttribute(string $class, string $attributeClass): bool
     {
         return $this->readAttribute($class, $attributeClass) !== null;
+    }
+
+    // ── Upload-aware schema helpers ──────────────────────────────────────────
+
+    /**
+     * Build a multipart/form-data request body schema for endpoints
+     * that accept file uploads alongside regular fields.
+     *
+     * Flattens model schema properties into form fields so Swagger UI
+     * renders each field as an actual form input.
+     */
+    protected function multipartRequestBody(string $schemaName, string $modelClass, array $uploads): array
+    {
+        $modelSchema  = $this->buildSchema($modelClass);
+        $modelProps   = $modelSchema['properties'] ?? [];
+        $uploadFields = array_keys($uploads);
+        $properties   = [];
+
+        // Flatten model properties as form-data fields, exclude upload fields + readOnly fields
+        foreach ($modelProps as $name => $prop) {
+            if (in_array($name, $uploadFields)) {
+                continue;
+            }
+            if (isset($prop['readOnly']) && $prop['readOnly']) {
+                continue;
+            }
+
+            $formField = [
+                'type'        => $prop['type'] ?? 'string',
+                'description' => $prop['description'] ?? "The {$name} value.",
+            ];
+
+            if (isset($prop['example'])) {
+                $formField['example'] = $prop['example'];
+            }
+
+            $properties[$name] = $formField;
+        }
+
+        // Add file upload fields with format: binary
+        foreach ($uploads as $field => $config) {
+            $multiple    = $config['multiple'] ?? false;
+            $description = $multiple ? "File upload. Multiple files accepted." : "File upload. Single file.";
+
+            if (isset($config['rules'])) {
+                $rules = is_array($config['rules']) ? implode(', ', $config['rules']) : $config['rules'];
+                $description .= " Rules: {$rules}.";
+            }
+
+            $fileProp = [
+                'type'        => $multiple ? 'array' : 'string',
+                'format'      => 'binary',
+                'description' => trim($description),
+            ];
+
+            if ($multiple) {
+                $fileProp['items'] = ['type' => 'string', 'format' => 'binary'];
+            }
+
+            $properties[$field] = $fileProp;
+        }
+
+        return [
+            'required' => true,
+            'content'  => [
+                'multipart/form-data' => [
+                    'schema' => [
+                        'type'       => 'object',
+                        'properties' => $properties,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Build the _uploads response schema showing file URLs.
+     */
+    protected function uploadResponseSchema(array $uploads): array
+    {
+        $properties = [];
+
+        foreach ($uploads as $field => $config) {
+            $multiple = $config['multiple'] ?? false;
+
+            if ($multiple) {
+                $properties[$field] = [
+                    'type'        => 'object',
+                    'description' => "Upload result for '{$field}' (multiple files).",
+                    'properties'  => [
+                        'urls'  => [
+                            'type'        => 'array',
+                            'items'       => ['type' => 'string', 'format' => 'uri'],
+                            'description' => 'Array of file URLs.',
+                        ],
+                        'uuids' => [
+                            'type'        => 'array',
+                            'items'       => ['type' => 'string'],
+                            'description' => 'Array of media UUIDs (Spatie Media Library only).',
+                        ],
+                    ],
+                ];
+            } else {
+                $properties[$field] = [
+                    'type'        => 'object',
+                    'description' => "Upload result for '{$field}'.",
+                    'properties'  => [
+                        'url'  => ['type' => 'string', 'format' => 'uri', 'description' => 'Public URL of the uploaded file.'],
+                        'uuid' => ['type' => 'string', 'description' => 'Media UUID (Spatie Media Library only).'],
+                    ],
+                ];
+            }
+        }
+
+        return [
+            'type'        => 'object',
+            'description' => 'Upload results keyed by field name. Present only when the request included files.',
+            'properties'  => $properties,
+        ];
     }
 }

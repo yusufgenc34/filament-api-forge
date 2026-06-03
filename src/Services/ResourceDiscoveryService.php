@@ -94,6 +94,38 @@ class ResourceDiscoveryService
     public function getAllowedFields(array $resource): array   { return $resource['api_config']['allowed_fields']   ?? []; }
     public function getRequiredScopes(array $resource): array  { return $resource['api_config']['scopes']           ?? []; }
 
+    /**
+     * Get all #[ApiAction] methods for a resource class.
+     *
+     * @return array<string, array{name: string, method: string, scope: string}>
+     */
+    public function getActions(string $resourceClass): array
+    {
+        $actions = [];
+
+        try {
+            $ref = new \ReflectionClass($resourceClass);
+
+            foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_STATIC) as $method) {
+                $attrs = $method->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiAction::class);
+
+                foreach ($attrs as $attr) {
+                    /** @var \YusufGenc34\FilamentApiForge\Attributes\ApiAction $instance */
+                    $instance = $attr->newInstance();
+                    $actions[$instance->name] = [
+                        'name'   => $instance->name,
+                        'method' => $instance->method,
+                        'scope'  => $instance->scope,
+                    ];
+                }
+            }
+        } catch (\Throwable) {
+            // Silently return empty if reflection fails
+        }
+
+        return $actions;
+    }
+
     public function flush(): void
     {
         $this->discoveredResources = null;

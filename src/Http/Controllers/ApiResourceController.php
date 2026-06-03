@@ -3,7 +3,15 @@
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
+use YusufGenc34\FilamentApiForge\Services\FileUploadService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
+use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -140,22 +148,48 @@ class ApiResourceController extends Controller
 
         $modelClass = $resource['model_class'];
         $resourceClass = $resource['resource_class'];
+        $apiConfig = $resource['api_config'];
 
-        // Extract validation rules from the Filament form schema
-        $rules = $this->extractValidationRules($resourceClass);
+        $rules = $this->extractValidationRules($resourceClass, false, $apiConfig);
+        $rules = $this->mergeUploadRules($rules, $apiConfig);
 
-        $validated = $request->validate($rules);
+        $data = $request->validate($rules);
+
+        // Strip upload fields from model data — they contain file objects
+        $uploadFields = array_keys($apiConfig['uploads'] ?? []);
+        $modelData = array_diff_key($data, array_flip($uploadFields));
+
+        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+
+        // Before-create hooks and event
+        $modelData = $this->executeBeforeHooks($resourceClass, 'beforeCreate', $modelData);
+
+        if ($eventsEnabled) {
+            ApiResourceCreating::dispatch($resourceClass, $modelData);
+        }
 
         $record = new $modelClass();
-        $record->fill($validated);
+        $record->fill($modelData);
         $record->save();
 
-        return (new ApiForgeJsonResource($record))
-            ->response()
-            ->setStatusCode(201)
-            ->getData(true)
-            ? new ApiForgeJsonResource($record->fresh())
-            : new ApiForgeJsonResource($record);
+        // Handle file uploads if configured
+        $uploadResults = $this->processFileUploads($record, $apiConfig, $request);
+
+        // After-create hooks and event
+        if ($eventsEnabled) {
+            ApiResourceCreated::dispatch($resourceClass, $record, $data);
+        }
+
+        $this->executeAfterHooks($resourceClass, 'afterCreate', $record, $data);
+
+        $fresh = $record->fresh();
+        $resource = new ApiForgeJsonResource($fresh);
+
+        if (! empty($uploadResults)) {
+            $resource->additional(['_uploads' => $uploadResults]);
+        }
+
+        return $resource;
     }
 
     /**
@@ -173,18 +207,48 @@ class ApiResourceController extends Controller
 
         $modelClass = $resource['model_class'];
         $resourceClass = $resource['resource_class'];
+        $apiConfig = $resource['api_config'];
 
         $record = $modelClass::findOrFail($recordId);
 
-        // Extract validation rules, making them update-friendly
-        $rules = $this->extractValidationRules($resourceClass, true);
+        $rules = $this->extractValidationRules($resourceClass, true, $apiConfig);
+        $rules = $this->mergeUploadRules($rules, $apiConfig);
 
-        $validated = $request->validate($rules);
+        $data = $request->validate($rules);
 
-        $record->fill($validated);
+        // Strip upload fields from model data — they contain file objects
+        $uploadFields = array_keys($apiConfig['uploads'] ?? []);
+        $modelData = array_diff_key($data, array_flip($uploadFields));
+
+        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+
+        // Before-update hooks and event
+        $modelData = $this->executeBeforeHooks($resourceClass, 'beforeUpdate', $record, $modelData);
+
+        if ($eventsEnabled) {
+            ApiResourceUpdating::dispatch($resourceClass, $record, $modelData);
+        }
+
+        $record->fill($modelData);
         $record->save();
 
-        return new ApiForgeJsonResource($record->fresh());
+        // Handle file uploads if configured
+        $uploadResults = $this->processFileUploads($record, $apiConfig, $request);
+
+        // After-update hooks and event
+        if ($eventsEnabled) {
+            ApiResourceUpdated::dispatch($resourceClass, $record, $data);
+        }
+
+        $this->executeAfterHooks($resourceClass, 'afterUpdate', $record, $data);
+
+        $resource = new ApiForgeJsonResource($record->fresh());
+
+        if (! empty($uploadResults)) {
+            $resource->additional(['_uploads' => $uploadResults]);
+        }
+
+        return $resource;
     }
 
     /**
@@ -201,8 +265,26 @@ class ApiResourceController extends Controller
         }
 
         $modelClass = $resource['model_class'];
+        $resourceClass = $resource['resource_class'];
         $record = $modelClass::findOrFail($recordId);
+
+        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+
+        // Before-delete hooks and event
+        $this->executeVoidHooks($resourceClass, 'beforeDelete', $record);
+
+        if ($eventsEnabled) {
+            ApiResourceDeleting::dispatch($resourceClass, $record);
+        }
+
         $record->delete();
+
+        // After-delete hooks and event
+        if ($eventsEnabled) {
+            ApiResourceDeleted::dispatch($resourceClass, $record);
+        }
+
+        $this->executeVoidHooks($resourceClass, 'afterDelete', $record);
 
         return response()->json([
             'message' => 'Resource deleted successfully.',
@@ -272,6 +354,115 @@ class ApiResourceController extends Controller
     }
 
     /**
+     * Execute "before" style hooks that transform data.
+     */
+    protected function executeBeforeHooks(string $resourceClass, string $hook, ...$args): array
+    {
+        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+
+        if (! $eventsEnabled || ! class_exists($resourceClass)) {
+            return $args[count($args) - 1];
+        }
+
+        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
+            return $resourceClass::{$hook}(...$args);
+        }
+
+        return $args[count($args) - 1];
+    }
+
+    /**
+     * Execute "after" style hooks that receive $record and $data.
+     */
+    protected function executeAfterHooks(string $resourceClass, string $hook, ...$args): void
+    {
+        if (! config('filament-api-forge.events.enabled', true) || ! class_exists($resourceClass)) {
+            return;
+        }
+
+        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
+            $resourceClass::{$hook}(...$args);
+        }
+    }
+
+    /**
+     * Execute void hooks (beforeDelete/afterDelete).
+     */
+    protected function executeVoidHooks(string $resourceClass, string $hook, ...$args): void
+    {
+        if (! config('filament-api-forge.events.enabled', true) || ! class_exists($resourceClass)) {
+            return;
+        }
+
+        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
+            $resourceClass::{$hook}(...$args);
+        }
+    }
+
+    /**
+     * Check if a resource class uses the ApiForgeHooks trait.
+     */
+    protected function usesApiForgeHooks(string $resourceClass): bool
+    {
+        if (! class_exists($resourceClass)) {
+            return false;
+        }
+
+        return in_array(ApiForgeHooks::class, class_uses($resourceClass));
+    }
+
+    /**
+     * Merge file upload validation rules from apiConfig into existing rules.
+     */
+    protected function mergeUploadRules(array $rules, array $apiConfig): array
+    {
+        $uploads = $apiConfig['uploads'] ?? [];
+
+        if (empty($uploads)) {
+            return $rules;
+        }
+
+        $uploadService = app(FileUploadService::class);
+        $uploadRules = $uploadService->getValidationRules($uploads);
+
+        // Upload fields need file-specific rules; override any generic defaults
+        foreach ($uploadRules as $field => $fileRules) {
+            $rules[$field] = $fileRules;
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Process file uploads for a record after save.
+     */
+    protected function processFileUploads(mixed $record, array $apiConfig, Request $request): array
+    {
+        $uploads = $apiConfig['uploads'] ?? [];
+
+        if (empty($uploads)) {
+            return [];
+        }
+
+        // Check if any configured upload field has a file
+        $hasFiles = false;
+        foreach (array_keys($uploads) as $field) {
+            if ($request->hasFile($field)) {
+                $hasFiles = true;
+                break;
+            }
+        }
+
+        if (! $hasFiles) {
+            return [];
+        }
+
+        $uploadService = app(FileUploadService::class);
+
+        return $uploadService->handleUploads($record, $uploads, $request);
+    }
+
+    /**
      * Extract validation rules for a resource.
      *
      * Priority order:
@@ -279,9 +470,9 @@ class ApiResourceController extends Controller
      *   2. apiConfig()['allowed_fields']   — generate basic rules from the allowed fields
      *   3. Model $fillable                  — last resort fallback
      */
-    protected function extractValidationRules(string $resourceClass, bool $isUpdate = false): array
+    protected function extractValidationRules(string $resourceClass, bool $isUpdate = false, ?array $apiConfig = null): array
     {
-        $apiConfig = $resourceClass::apiConfig();
+        $apiConfig ??= $resourceClass::apiConfig();
 
         // 1. If the developer has explicitly defined validation_rules, use them directly
         if (! empty($apiConfig['validation_rules'])) {

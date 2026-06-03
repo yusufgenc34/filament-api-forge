@@ -233,177 +233,261 @@ $pathMap = [
         </div>
     </div>
 
-    {{-- ── Discovered resources ─────────────────────────────── --}}
+    {{-- ── Resource Tree (full-width) ───────────────────────── --}}
+    @php
+    $treeMeta = [
+        'index'   => ['verb' => 'GET',    'fg' => '#1d4ed8', 'bg' => '#eff6ff', 'pill' => '#bfdbfe', 'path' => ''],
+        'show'    => ['verb' => 'GET',    'fg' => '#1d4ed8', 'bg' => '#eff6ff', 'pill' => '#bfdbfe', 'path' => '/:id'],
+        'store'   => ['verb' => 'POST',   'fg' => '#166534', 'bg' => '#f0fdf4', 'pill' => '#bbf7d0', 'path' => ''],
+        'update'  => ['verb' => 'PUT',    'fg' => '#92400e', 'bg' => '#fffbeb', 'pill' => '#fde68a', 'path' => '/:id'],
+        'destroy' => ['verb' => 'DELETE', 'fg' => '#9f1239', 'bg' => '#fff1f2', 'pill' => '#fecdd3', 'path' => '/:id'],
+    ];
+    $treeN = count($treeResources);
+    @endphp
+
+    <style>
+    /* ── Tree ───────────────────────────────────────────── */
+    .api-tree-wrap {
+        overflow-y: auto;
+        max-height: 480px;
+        padding: 1rem 1.5rem;
+        scrollbar-width: thin;
+        scrollbar-color: #e2e8f0 transparent;
+    }
+    .dark .api-tree-wrap { scrollbar-color: #374151 transparent; }
+
+    .api-tree-root-node {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 0.35rem 0.875rem;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        margin-left: 0.5rem;
+    }
+    .api-tree-root-dot { width:6px; height:6px; border-radius:50%; background:#38bdf8; flex-shrink:0; }
+
+    .api-tree-branch {
+        padding-left: 1.25rem;
+        border-left: 1.5px solid #e2e8f0;
+        margin-left: 1rem;
+        margin-top: 0.125rem;
+    }
+    .dark .api-tree-branch { border-left-color: #334155; }
+
+    .api-tree-node { position: relative; padding-top: 0.5rem; }
+    .api-tree-node::before {
+        content: '';
+        position: absolute;
+        top: calc(0.5rem + 0.875rem);
+        left: -1.25rem;
+        width: 0.875rem;
+        height: 1.5px;
+        background: #e2e8f0;
+    }
+    .dark .api-tree-node::before { background: #334155; }
+
+    /* Enabled resource row */
+    .api-tree-res {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.625rem;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.12s;
+        user-select: none;
+    }
+    .dark .api-tree-res { background: #1e293b; border-color: #334155; }
+    .api-tree-res:hover { border-color: #94a3b8; }
+    .dark .api-tree-res:hover { border-color: #475569; }
+
+    /* Disabled resource row — not clickable, red tint */
+    .api-tree-res-disabled {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.625rem;
+        border-radius: 6px;
+        border: 1px solid #fecaca;
+        background: #fff5f5;
+        opacity: 0.75;
+        user-select: none;
+    }
+    .dark .api-tree-res-disabled { background: #1a0a0a; border-color: #7f1d1d; }
+
+    .api-tree-res-name { font-size:0.8rem; font-weight:600; color:#1e293b; flex-shrink:0; }
+    .dark .api-tree-res-name { color:#f1f5f9; }
+    .api-tree-res-name-disabled { font-size:0.8rem; font-weight:600; color:#9f1239; flex-shrink:0; text-decoration:line-through; }
+
+    .api-tree-res-panel { font-size:0.67rem; color:#94a3b8; font-family:ui-monospace,monospace; flex-shrink:0; }
+
+    .api-tree-disabled-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        font-size: 0.62rem;
+        font-weight: 600;
+        color: #be123c;
+        background: #ffe4e6;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+    .api-tree-disabled-badge svg { width:10px; height:10px; }
+
+    .api-tree-pills { display:flex; gap:0.2rem; flex-wrap:wrap; flex:1; }
+    .api-tree-pill { padding:0.06rem 0.3rem; border-radius:3px; font-size:0.59rem; font-weight:700; font-family:ui-monospace,monospace; letter-spacing:0.04em; }
+
+    .api-tree-chevron { width:13px; height:13px; color:#9ca3af; flex-shrink:0; transition:transform 0.15s; margin-left:auto; }
+    .api-tree-chevron.rotated { transform:rotate(90deg); }
+
+    .api-tree-methods {
+        padding-left: 1rem;
+        border-left: 1.5px solid #f1f5f9;
+        margin-left: 0.875rem;
+        margin-top: 0.25rem;
+        padding-bottom: 0.125rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.175rem;
+    }
+    .dark .api-tree-methods { border-left-color: #334155; }
+
+    .api-tree-method { display:flex; align-items:center; gap:0.5rem; padding:0.2rem 0.375rem; border-radius:4px; position:relative; }
+    .api-tree-method::before { content:''; position:absolute; top:50%; left:-1rem; width:0.625rem; height:1.5px; background:#e2e8f0; }
+    .dark .api-tree-method::before { background:#334155; }
+
+    /* Disabled method row */
+    .api-tree-method-disabled { display:flex; align-items:center; gap:0.5rem; padding:0.2rem 0.375rem; border-radius:4px; position:relative; opacity:0.45; }
+    .api-tree-method-disabled::before { content:''; position:absolute; top:50%; left:-1rem; width:0.625rem; height:1.5px; background:#fca5a5; }
+
+    .api-tree-verb { font-family:ui-monospace,monospace; font-size:0.63rem; font-weight:700; letter-spacing:0.06em; padding:0.15rem 0.4rem; border-radius:3px; min-width:48px; text-align:center; flex-shrink:0; }
+    .api-tree-verb-disabled { font-family:ui-monospace,monospace; font-size:0.63rem; font-weight:700; letter-spacing:0.06em; padding:0.15rem 0.4rem; border-radius:3px; min-width:48px; text-align:center; flex-shrink:0; background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
+
+    .api-tree-path { font-family:ui-monospace,monospace; font-size:0.71rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .dark .api-tree-path { color:#94a3b8; }
+    .api-tree-path-disabled { font-family:ui-monospace,monospace; font-size:0.71rem; color:#d1d5db; white-space:nowrap; text-decoration:line-through; }
+
+    .api-tree-disabled-x { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; color:#be123c; margin-left:auto; flex-shrink:0; }
+    </style>
+
     <div class="dd-card">
         <div class="dd-card-head">
             <svg class="dd-card-head-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v11.5A2.25 2.25 0 004.25 18h11.5A2.25 2.25 0 0018 15.75V4.25A2.25 2.25 0 0015.75 2H4.25zM15 5.75a.75.75 0 00-1.5 0v8.5a.75.75 0 001.5 0v-8.5zm-8.5 6a.75.75 0 00-1.5 0v2.5a.75.75 0 001.5 0v-2.5zM11 10a.75.75 0 00-1.5 0v4.25a.75.75 0 001.5 0V10z" clip-rule="evenodd"/>
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h9a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h5a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm9-13a1 1 0 10-2 0v9.586l-1.293-1.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L12 12.586V3z" clip-rule="evenodd"/>
             </svg>
-            <span class="dd-card-head-title">API Resources</span>
-            <span class="dd-card-head-sub">Base: <code style="font-size:0.72rem;color:#6b7280;">{{ $apiBaseUrl }}</code></span>
+            <span class="dd-card-head-title">Resource Tree</span>
+            <span class="dd-card-head-sub">
+                {{ $treeN }} resource{{ $treeN !== 1 ? 's' : '' }}
+                @php $disabledCount = collect($treeResources)->where('enabled', false)->count(); @endphp
+                @if($disabledCount > 0)
+                &nbsp;·&nbsp;<span style="color:#be123c;">{{ $disabledCount }} disabled</span>
+                @endif
+                &nbsp;·&nbsp;<code style="font-size:0.68rem;color:#9ca3af;">{{ $apiBaseUrl }}</code>
+            </span>
         </div>
 
-        @if(count($apiResources) > 0)
-        <table class="dd-table">
-            <thead>
-                <tr>
-                    <th>Resource</th>
-                    <th>Base Endpoint</th>
-                    <th>HTTP Methods</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($apiResources as $resource)
-                @php
-                    $slug    = $resource['slug'];
-                    $panel   = $resource['panel_id'];
-                    $methods = $resource['api_config']['allowed_methods'] ?? [];
-                    $baseEp  = "/{$panel}/{$slug}";
-
-                    $httpMethods = collect($methods)->map(fn($m) => $httpMap[$m][0] ?? strtoupper($m))->unique()->values();
-                @endphp
-                <tr>
-                    <td>
-                        <div class="dd-res-name">{{ $resource['plural_label'] }}</div>
-                        <div class="dd-res-panel">panel: {{ $panel }}</div>
-                    </td>
-                    <td>
-                        <span class="dd-endpoint">{{ $apiBaseUrl }}/{{ $panel }}/{{ $slug }}</span>
-                    </td>
-                    <td>
-                        <div class="dd-methods">
-                            @foreach($methods as $method)
-                            @php
-                                [$http, $color] = $httpMap[$method] ?? [strtoupper($method), 'get'];
-                                $label = $http . ($method === 'index' ? ' list' : ($method === 'show' ? ' /{id}' : ($method === 'store' ? '' : ($method === 'update' ? ' /{id}' : ' /{id}'))));
-                            @endphp
-                            <span class="dd-badge dd-badge-{{ $color }}">{{ $http }}{{ in_array($method, ['show','update','destroy']) ? ' /{id}' : '' }}</span>
-                            @endforeach
-                        </div>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
+        @if($treeN === 0)
+        <div class="dd-empty">No resources found. Add <code>implements HasApi</code> to a Filament Resource.</div>
         @else
-        <div class="dd-empty">
-            No resources found. Add <code>implements HasApi</code> to a Filament Resource.
+        <div class="api-tree-wrap">
+
+            <div style="margin-bottom:0.125rem;">
+                <div class="api-tree-root-node">
+                    <span class="api-tree-root-dot"></span>
+                    API Forge
+                </div>
+            </div>
+
+            <div class="api-tree-branch">
+                @foreach($treeResources as $res)
+                @php
+                    $enabled = $res['enabled'];
+                    $methods = $res['methods'] ?? [];
+                    $slug    = $res['slug'];
+                    $panel   = $res['panel_id'];
+                    $hasDisabledMethod = collect($methods)->where('disabled', true)->count() > 0;
+                @endphp
+
+                @if($enabled)
+                {{-- Enabled resource --}}
+                <div class="api-tree-node" x-data="{ open: false }">
+                    <div class="api-tree-res" @click="open = !open">
+                        <span class="api-tree-res-name">{{ $res['plural_label'] }}</span>
+                        <span class="api-tree-res-panel">{{ $panel }}</span>
+
+                        <div class="api-tree-pills" x-show="!open">
+                            @foreach($methods as $m)
+                            @php $meta = $treeMeta[$m['method']] ?? ['verb' => strtoupper($m['method']), 'pill' => '#e5e7eb', 'fg' => '#6b7280']; @endphp
+                            @if(!$m['disabled'])
+                            <span class="api-tree-pill" style="background:{{ $meta['pill'] }};color:{{ $meta['fg'] }};">{{ $meta['verb'] }}</span>
+                            @endif
+                            @endforeach
+                            @if($hasDisabledMethod)
+                            <span style="font-size:0.6rem;color:#be123c;font-weight:600;">· some methods disabled</span>
+                            @endif
+                        </div>
+
+                        <svg class="api-tree-chevron" :class="open && 'rotated'" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+
+                    <div class="api-tree-methods"
+                         x-show="open"
+                         x-transition:enter="transition-opacity ease-out duration-150"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         x-transition:leave="transition-opacity ease-in duration-100"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0">
+                        @foreach($methods as $m)
+                        @php
+                            $meta = $treeMeta[$m['method']] ?? ['verb' => strtoupper($m['method']), 'fg' => '#6b7280', 'bg' => '#f9fafb', 'path' => ''];
+                            $path = '/' . $panel . '/' . $slug . $meta['path'];
+                        @endphp
+                        @if(!$m['disabled'])
+                        <div class="api-tree-method">
+                            <span class="api-tree-verb" style="background:{{ $meta['bg'] }};color:{{ $meta['fg'] }};">{{ $meta['verb'] }}</span>
+                            <span class="api-tree-path" title="{{ $apiBaseUrl }}{{ $path }}">{{ $path }}</span>
+                        </div>
+                        @else
+                        <div class="api-tree-method-disabled" title="This method is disabled">
+                            <span class="api-tree-verb-disabled">{{ $meta['verb'] }}</span>
+                            <span class="api-tree-path-disabled">{{ $path }}</span>
+                            <svg class="api-tree-disabled-x" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        @endif
+                        @endforeach
+                    </div>
+                </div>
+
+                @else
+                {{-- Disabled resource — no expand --}}
+                <div class="api-tree-node">
+                    <div class="api-tree-res-disabled">
+                        <span class="api-tree-res-name-disabled">{{ $res['plural_label'] }}</span>
+                        <span class="api-tree-res-panel">{{ $panel }}</span>
+                        <span class="api-tree-disabled-badge">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/></svg>
+                            Disabled
+                        </span>
+                    </div>
+                </div>
+                @endif
+
+                @endforeach
+            </div>
         </div>
         @endif
-    </div>
-
-    {{-- ── Authentication & Quick Start ────────────────────── --}}
-    <div class="dd-card">
-        <div class="dd-card-head">
-            <svg class="dd-card-head-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M8 7a5 5 0 113.61 4.804L11 13H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.414-5.414A5 5 0 018 7zm2-3a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/>
-            </svg>
-            <span class="dd-card-head-title">Authentication & Quick Start</span>
-        </div>
-
-        <div class="dd-auth-grid">
-            {{-- Left: how auth works --}}
-            <div class="dd-auth-col">
-                <div class="dd-auth-col-title">Bearer Token Authentication</div>
-                <div class="dd-copy-wrap" x-data="{copied:false}">
-                    <div class="dd-code">
-                        <span class="c"># All API requests require a Bearer token</span><br>
-                        <span class="kw">curl</span> -H <span class="st">"Authorization: Bearer forge_..."</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; <span class="url">{{ $apiBaseUrl }}/..</span>
-                    </div>
-                </div>
-
-                <div style="margin-top:0.875rem;padding:0.75rem 1rem;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6;">
-                    <div style="font-size:0.72rem;font-weight:600;color:#374151;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em;">Token Format</div>
-                    <code style="font-family:ui-monospace,monospace;font-size:0.8rem;color:#4b5563;">forge_<span style="color:#9ca3af;">&lt;40-char random&gt;</span></code>
-                    <div style="margin-top:0.375rem;font-size:0.72rem;color:#9ca3af;">SHA-256 hashed at rest · shown once at creation</div>
-                </div>
-
-                <div style="margin-top:0.875rem;">
-                    <div style="font-size:0.72rem;font-weight:600;color:#374151;margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em;">Scopes</div>
-                    <div style="display:flex;flex-direction:column;gap:0.35rem;font-size:0.8rem;">
-                        <div style="display:flex;gap:0.5rem;align-items:center;">
-                            <code style="background:#eff6ff;color:#1d4ed8;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;">read</code>
-                            <span style="color:#6b7280;">GET requests</span>
-                        </div>
-                        <div style="display:flex;gap:0.5rem;align-items:center;">
-                            <code style="background:#fffbeb;color:#b45309;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;">write</code>
-                            <span style="color:#6b7280;">POST / PUT / PATCH requests</span>
-                        </div>
-                        <div style="display:flex;gap:0.5rem;align-items:center;">
-                            <code style="background:#fff1f2;color:#be123c;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;">delete</code>
-                            <span style="color:#6b7280;">DELETE requests</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Right: example requests --}}
-            <div class="dd-auth-col">
-                <div class="dd-auth-col-title">Example Requests</div>
-
-                @if(count($apiResources) > 0)
-                @php
-                    $first   = $apiResources[0];
-                    $panel   = $first['panel_id'];
-                    $slug    = $first['slug'];
-                    $filters = $first['api_config']['allowed_filters'] ?? [];
-                    $sorts   = $first['api_config']['allowed_sorts'] ?? [];
-                    $includes= $first['api_config']['allowed_includes'] ?? [];
-                    $qs = [];
-                    if(!empty($filters)) $qs[] = 'filter['.($filters[0]).']=value';
-                    if(!empty($sorts))   $qs[] = 'sort=-'.($sorts[0]);
-                    if(!empty($includes))$qs[] = 'include='.($includes[0]);
-                @endphp
-
-                @php
-                    $cmd1 = 'curl -H "Authorization: Bearer forge_..." ' . $apiBaseUrl . '/' . $panel . '/' . $slug;
-                @endphp
-                <div class="dd-copy-wrap" x-data="{ copied: false, text: @js($cmd1) }">
-                    <div class="dd-code">
-                        <span class="c"># List {{ $first['plural_label'] }}</span><br>
-                        <span class="kw">curl</span> -H <span class="st">"Authorization: Bearer forge_..."</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; <span class="url">{{ $apiBaseUrl }}/{{ $panel }}/{{ $slug }}</span>
-                    </div>
-                    <button class="dd-copy-btn" @click="navigator.clipboard.writeText(text); copied=true; setTimeout(()=>copied=false,2000)">
-                        <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
-                    </button>
-                </div>
-
-                @if(!empty($qs))
-                @php
-                    $qstr = implode('&', $qs);
-                    $cmd2 = 'curl -H "Authorization: Bearer forge_..." "' . $apiBaseUrl . '/' . $panel . '/' . $slug . '?' . $qstr . '"';
-                @endphp
-                <div class="dd-copy-wrap" style="margin-top:0.625rem;" x-data="{ copied: false, text: @js($cmd2) }">
-                    <div class="dd-code">
-                        <span class="c"># With filters & sorting</span><br>
-                        <span class="kw">curl</span> -H <span class="st">"Authorization: Bearer forge_..."</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; <span class="url">"{{ $apiBaseUrl }}/{{ $panel }}/{{ $slug }}?{{ $qstr }}"</span>
-                    </div>
-                    <button class="dd-copy-btn" @click="navigator.clipboard.writeText(text); copied=true; setTimeout(()=>copied=false,2000)">
-                        <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
-                    </button>
-                </div>
-                @endif
-
-                <div class="dd-copy-wrap" style="margin-top:0.625rem;" x-data="{copied:false}">
-                    <div class="dd-code">
-                        <span class="c"># Create a record (write scope required)</span><br>
-                        <span class="kw">curl</span> -X POST \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; -H <span class="st">"Authorization: Bearer forge_..."</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; -H <span class="st">"Content-Type: application/json"</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; -d <span class="st">'{"field": "value"}'</span> \<br>
-                        &nbsp;&nbsp;&nbsp;&nbsp; <span class="url">{{ $apiBaseUrl }}/{{ $panel }}/{{ $slug }}</span>
-                    </div>
-                </div>
-                @else
-                <div class="dd-empty" style="padding:1.5rem 0 0.5rem;">
-                    No resources discovered yet.
-                </div>
-                @endif
-            </div>
-        </div>
     </div>
 
 </div>

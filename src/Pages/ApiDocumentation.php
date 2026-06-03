@@ -214,20 +214,40 @@ class ApiDocumentation extends Page
                 }
 
                 if (in_array($ep['method'], ['POST', 'PUT', 'PATCH'])) {
-                    $ref        = $ep['operation']['requestBody']['content']['application/json']['schema']['$ref'] ?? '';
-                    $schemaName = str_replace('#/components/schemas/', '', $ref);
-                    $schema     = $this->schemas[$schemaName] ?? null;
-                    if ($schema) {
+                    $content = $ep['operation']['requestBody']['content'] ?? [];
+
+                    if (isset($content['multipart/form-data'])) {
+                        // Multipart form-data: build example body from flattened properties
+                        $multipartSchema = $content['multipart/form-data']['schema'] ?? [];
                         $body = [];
-                        foreach ($schema['properties'] ?? [] as $prop => $def) {
+                        foreach ($multipartSchema['properties'] ?? [] as $prop => $def) {
                             if ($def['readOnly'] ?? false) continue;
-                            $body[$prop] = match ($def['type'] ?? 'string') {
+                            $isFile = ($def['format'] ?? '') === 'binary';
+                            $body[$prop] = $isFile ? ($def['type'] === 'array' ? ['<file>', '<file>'] : '<file>') : match ($def['type'] ?? 'string') {
                                 'integer' => 0,
                                 'boolean' => false,
                                 default   => '',
                             };
                         }
                         $this->tryBody = json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                    } elseif (isset($content['application/json'])) {
+                        $ref        = $content['application/json']['schema']['$ref'] ?? '';
+                        $schemaName = str_replace('#/components/schemas/', '', $ref);
+                        $schema     = $this->schemas[$schemaName] ?? null;
+                        if ($schema) {
+                            $body = [];
+                            foreach ($schema['properties'] ?? [] as $prop => $def) {
+                                if ($def['readOnly'] ?? false) continue;
+                                $body[$prop] = match ($def['type'] ?? 'string') {
+                                    'integer' => 0,
+                                    'boolean' => false,
+                                    default   => '',
+                                };
+                            }
+                            $this->tryBody = json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                        } else {
+                            $this->tryBody = '{}';
+                        }
                     } else {
                         $this->tryBody = '{}';
                     }
