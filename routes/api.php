@@ -14,14 +14,33 @@ use Illuminate\Support\Facades\Route;
 |
 | Route ordering is critical: more specific routes must be registered
 | before less specific ones to prevent wildcard parameter capture.
+| Action routes carry a literal prefix segment, so they must precede the
+| nested wildcard routes — otherwise nested {childSlug}/{childId} patterns
+| capture GET/PUT/PATCH/DELETE action requests.
 |
-| Order: batch → nested → actions → standard CRUD
+| Order: batch → actions → nested → standard CRUD
 |
 */
+
+$actionsPrefix = config('filament-api-forge.actions.prefix', 'actions');
 
 // Batch operations (3 segments, literal 'batch')
 Route::post('{panelId}/{resourceSlug}/batch', [ApiBatchController::class, 'batch'])
     ->name('api-forge.batch');
+
+// Collection-level custom actions (4 segments, literal prefix)
+Route::match(
+    ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    '{panelId}/{resourceSlug}/' . $actionsPrefix . '/{actionName}',
+    [ApiActionController::class, 'executeCollection']
+)->name('api-forge.action.collection');
+
+// Record-level custom actions (5 segments, literal prefix)
+Route::match(
+    ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    '{panelId}/{resourceSlug}/{recordId}/' . $actionsPrefix . '/{actionName}',
+    [ApiActionController::class, 'execute']
+)->name('api-forge.action');
 
 // Nested resource routes (4-5 segments)
 Route::get('{panelId}/{resourceSlug}/{recordId}/{childSlug}', [ApiNestedResourceController::class, 'index'])
@@ -36,13 +55,6 @@ Route::patch('{panelId}/{resourceSlug}/{recordId}/{childSlug}/{childId}', [ApiNe
     ->name('api-forge.nested.update.patch');
 Route::delete('{panelId}/{resourceSlug}/{recordId}/{childSlug}/{childId}', [ApiNestedResourceController::class, 'destroy'])
     ->name('api-forge.nested.destroy');
-
-// Custom action endpoints (5 segments, literal 'actions')
-Route::match(
-    ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    '{panelId}/{resourceSlug}/{recordId}/actions/{actionName}',
-    [ApiActionController::class, 'execute']
-)->name('api-forge.action');
 
 // Standard CRUD routes (2-3 segments)
 Route::get('{panelId}/{resourceSlug}', [ApiResourceController::class, 'index'])

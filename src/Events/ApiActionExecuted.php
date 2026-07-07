@@ -12,7 +12,7 @@ class ApiActionExecuted
     public function __construct(
         public readonly string $resourceClass,
         public readonly string $actionName,
-        public readonly Model $record,
+        public readonly ?Model $record,
         public readonly mixed $result,
     ) {}
 }

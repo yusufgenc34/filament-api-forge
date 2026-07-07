@@ -46,6 +46,11 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 | **Access Control** | Dedicated panel page — enable/disable methods or entire resources, set rate limits and IP rules |
 | **Rate Limiting** | Global, per-resource, and per-method limits — method overrides resource, resource overrides global |
 | **IP Restrictions** | Whitelist IPs per resource or per method (CIDR, wildcard, exact) |
+| **Lifecycle Hooks & Events** | `beforeCreate`/`afterUpdate`-style hooks on your Resource, plus dispatched Laravel events for every write operation |
+| **File Uploads** | `multipart/form-data` uploads on store/update — Spatie Media Library integration with Laravel Filesystem fallback |
+| **Custom Actions** | Expose domain actions (`publish`, `archive`, …) as endpoints with a single `#[ApiAction]` attribute |
+| **Nested Resources** | Full CRUD on child relations (`/posts/1/comments`) with scoped binding and per-relation rules |
+| **Batch Operations** | Transaction-wrapped bulk create/update/delete in a single request |
 | **OpenAPI Docs** | Dynamically generated OpenAPI 3.0 spec with interactive Swagger UI |
 | **Public Docs** | Publish your API docs to a standalone public URL with a single click — light/dark mode included |
 | **Route Segment** | Replace the panel ID in API paths with a custom segment (e.g. `/filament/posts`) |
@@ -60,6 +65,7 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 - Laravel **12+**
 - Filament **5.x**
 - Spatie Laravel Query Builder **5+**
+- Spatie Media Library **11+** _(optional — enables media collections for file uploads)_
 
 ---
 
@@ -155,6 +161,9 @@ class PostResource extends Resource implements HasApi
 | `searchable` | `string[]` | Columns searched via `?search=query` |
 | `scopes` | `string[]` | Required token scopes: `read`, `write`, `delete` |
 | `validation_rules` | `array` | Explicit rules for `store`/`update`. Falls back to `allowed_fields` → `$fillable` |
+| `uploads` | `array` | File upload fields — see [File Uploads](#file-uploads) |
+| `relations` | `array` | Nested child resources — see [Nested Resources](#nested-resources) |
+| `batch` | `array` | Per-resource batch overrides (`max_size`, `allowed_operations`) — see [Batch Operations](#batch-operations) |
 
 ### 3. Enrich the OpenAPI Docs (optional)
 
@@ -305,9 +314,244 @@ DELETE /api/v1/admin/posts/1
 | `403` | `resource_not_allowed` | Token restricted to other resources |
 | `403` | `ip_forbidden` | Client IP is not whitelisted |
 | `404` | `not_found` | Resource or record not found / disabled |
+| `404` | `action_not_found` | Custom action is not defined on the resource |
 | `405` | `method_not_allowed` | Method is disabled for this resource |
 | `422` | _(validation)_ | Request data failed validation |
 | `429` | `rate_limit_exceeded` | Too many requests |
+
+---
+
+## Lifecycle Hooks & Events
+
+Add the `ApiForgeHooks` trait to your Resource to intercept API write operations:
+
+```php
+use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
+
+class PostResource extends Resource implements HasApi
+{
+    use ApiForgeHooks;
+
+    public static function beforeCreate(array $data): array
+    {
+        $data['slug'] = Str::slug($data['title']);
+        return $data;
+    }
+
+    public static function afterCreate(Model $record, array $data): void
+    {
+        // e.g. notify, sync, log…
+    }
+}
+```
+
+Available hooks: `beforeCreate`, `afterCreate`, `beforeUpdate`, `afterUpdate`, `beforeDelete`, `afterDelete`. The `before*` hooks for create/update receive the validated data and must return it (modified or not).
+
+Call `PostResource::withoutHooks()` to skip hooks for the **next** API call only — useful in seeding or test scenarios.
+
+In addition to hooks, a Laravel event is dispatched for every write operation, so any listener can subscribe:
+
+| Event | Dispatched |
+|-------|-----------|
+| `ApiResourceCreating` / `ApiResourceCreated` | Around `store` |
+| `ApiResourceUpdating` / `ApiResourceUpdated` | Around `update` |
+| `ApiResourceDeleting` / `ApiResourceDeleted` | Around `destroy` |
+| `ApiActionExecuting` / `ApiActionExecuted` | Around [custom actions](#custom-action-endpoints) |
+
+Hooks and events also fire for [nested resource](#nested-resources) writes (events, with the child record) and for every row of a [batch operation](#batch-operations) (hooks + events).
+
+Both systems can be toggled via config: `events.enabled` (hooks + events) and `events.dispatch_events` (events only).
+
+---
+
+## File Uploads
+
+Declare uploadable fields in `apiConfig()` under the `uploads` key:
+
+```php
+public static function apiConfig(): array
+{
+    return [
+        // ...
+        'uploads' => [
+            'avatar' => [
+                'disk'      => 'public',            // storage disk (default: uploads.default_disk)
+                'directory' => 'avatars',           // target directory (default: field name)
+                'rules'     => 'image|max:2048',    // validation rules (string or array)
+                'multiple'  => false,               // allow multiple files
+                'collection' => 'avatars',          // Media Library collection (default: field name)
+            ],
+        ],
+    ];
+}
+```
+
+Then send `multipart/form-data` requests to the `store` / `update` endpoints:
+
+```bash
+curl -X POST /api/v1/admin/users \
+     -H "Authorization: Bearer forge_..." \
+     -F "name=Jane" -F "email=jane@example.com" \
+     -F "avatar=@/path/to/avatar.png"
+```
+
+How it works:
+
+- If the model uses **Spatie Media Library** (`InteractsWithMedia`), files go to the configured media collection and the response includes media UUIDs and URLs.
+- Otherwise files are stored via the **Laravel Filesystem** on the configured disk, and the file path is persisted to the model attribute (so Filament previews keep working).
+- Upload rules are auto-merged into validation; file fields are stripped from the model fill.
+- The response includes an `_uploads` key with the stored URLs:
+
+```json
+{
+  "data": { "id": 1, "name": "Jane" },
+  "_uploads": {
+    "avatar": { "url": "https://yourapp.com/storage/avatars/xxx.png", "uuid": null }
+  }
+}
+```
+
+The OpenAPI spec advertises these endpoints as `multipart/form-data` with `format: binary` fields automatically.
+
+---
+
+## Custom Action Endpoints
+
+Expose domain actions beyond CRUD with the `#[ApiAction]` attribute on a public static method of your Resource:
+
+```php
+use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
+
+class PostResource extends Resource implements HasApi
+{
+    #[ApiAction('publish', method: 'POST', scope: 'write')]
+    public static function publish(Model $record, array $data): array
+    {
+        $record->update(['status' => 'published']);
+        return ['status' => 'published'];
+    }
+}
+```
+
+The action becomes available at:
+
+```
+POST /api/v1/admin/posts/{id}/actions/publish
+```
+
+```json
+{
+  "message": "Action 'publish' executed successfully.",
+  "action": "publish",
+  "result": { "status": "published" }
+}
+```
+
+- `method` (default `POST`) — requests with a different HTTP verb get `405`.
+- `scope` (default `write`) — tokens missing the scope get `403 insufficient_scope`.
+- The method receives the resolved record and the request payload; whatever it returns is serialized into `result`.
+- `ApiActionExecuting` / `ApiActionExecuted` events fire around execution.
+- Actions are discovered via reflection and appear in the OpenAPI docs automatically.
+- The `/actions/` URL prefix is configurable via `actions.prefix`.
+
+### Collection-Level Actions
+
+Pass `record: false` to expose an action that operates on the whole collection instead of a single record:
+
+```php
+#[ApiAction('sync', method: 'POST', scope: 'write', record: false)]
+public static function sync(array $data): array
+{
+    // e.g. trigger an import, recalculate aggregates…
+    return ['synced' => true];
+}
+```
+
+```
+POST /api/v1/admin/posts/actions/sync
+```
+
+Collection actions receive only the request payload (no record). Calling a record-level action on the collection URL — or vice versa — returns `404 action_not_found`.
+
+---
+
+## Nested Resources
+
+Expose child relations with full CRUD under the parent's URL. Declare them in `apiConfig()` under the `relations` key:
+
+```php
+public static function apiConfig(): array
+{
+    return [
+        // ...
+        'relations' => [
+            'comments' => [
+                'relation_name'    => 'comments',   // Eloquent relation method on the model
+                'allowed_methods'  => ['index', 'show', 'store', 'update', 'destroy'],
+                'allowed_filters'  => ['status'],
+                'allowed_sorts'    => ['created_at'],
+                'allowed_includes' => ['author'],
+                'allowed_fields'   => ['id', 'body', 'status'],
+                'validation_rules' => [
+                    'body' => ['required', 'string'],
+                ],
+            ],
+        ],
+    ];
+}
+```
+
+Routes follow the pattern `{parent}/{id}/{child}[/{childId}]`:
+
+```bash
+GET    /api/v1/admin/posts/1/comments          # list (paginated, filterable)
+GET    /api/v1/admin/posts/1/comments/5        # show
+POST   /api/v1/admin/posts/1/comments          # create through the relation
+PUT    /api/v1/admin/posts/1/comments/5        # update
+DELETE /api/v1/admin/posts/1/comments/5        # delete
+```
+
+Binding is **scoped**: a child is always resolved through the parent's relation, so a comment belonging to another post returns `404`. On `update`, validation rules are automatically relaxed with `sometimes`. Disabled methods return `405`.
+
+The `index` endpoint supports `filter`, `sort`, `include` and `fields` query parameters (driven by the per-relation `allowed_*` keys above), and `show` supports `include`/`fields`. Nested writes dispatch the same `ApiResourceCreating`/`Created`/`Updating`/`Updated`/`Deleting`/`Deleted` events as top-level endpoints, carrying the child record.
+
+---
+
+## Batch Operations
+
+Perform bulk create, update, and delete in a single transaction-wrapped request:
+
+```bash
+POST /api/v1/admin/posts/batch
+Content-Type: application/json
+
+{
+  "create": [
+    { "title": "First",  "status": "draft" },
+    { "title": "Second", "status": "draft" }
+  ],
+  "update": [
+    { "id": 7, "status": "published" }
+  ],
+  "delete": [3, 4]
+}
+```
+
+Response:
+
+```json
+{
+  "message": "Batch operation completed.",
+  "created": [12, 13],
+  "updated": [7],
+  "deleted": [3, 4],
+  "failed": []
+}
+```
+
+Rows that cannot be processed are reported in `failed` with their operation, index and reason (plus per-field `errors` for validation failures). Limits and allowed operations come from config (`batch.max_size`, `batch.allowed_operations`) and can be overridden per resource via the `batch` key in `apiConfig()`.
+
+Every row goes through the full Eloquent pipeline: `validation_rules` are applied (relaxed with `sometimes` for updates), [lifecycle hooks](#lifecycle-hooks--events) run, and `ApiResource*` events are dispatched per row — exactly as if each row had been sent to the standard CRUD endpoints. A `withoutHooks()` call suppresses hooks for the entire batch.
 
 ---
 
@@ -428,6 +672,31 @@ return [
         'enable_sorts'    => true,
         'enable_includes' => true,
         'enable_fields'   => true,
+    ],
+
+    'events' => [
+        'enabled'         => true,   // master switch for hooks + events
+        'dispatch_events' => true,   // dispatch Laravel events
+    ],
+
+    'uploads' => [
+        'default_disk'  => env('API_FORGE_UPLOAD_DISK', 'public'),
+        'max_file_size' => 10240,    // KB
+    ],
+
+    'actions' => [
+        'prefix' => 'actions',       // {resource}/{id}/actions/{name}
+    ],
+
+    'nested_resources' => [
+        'enabled'           => true,
+        'max_nesting_depth' => 1,
+    ],
+
+    'batch' => [
+        'enabled'            => true,
+        'max_size'           => 100,
+        'allowed_operations' => ['create', 'update', 'delete'],
     ],
 ];
 ```

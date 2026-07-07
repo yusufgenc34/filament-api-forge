@@ -11,5 +11,6 @@ final class ApiAction
         public readonly string $name,
         public readonly string $method = 'POST',
         public readonly string $scope = 'write',
+        public readonly bool $record = true,
     ) {}
 }

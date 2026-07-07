@@ -2,10 +2,11 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
+use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
+use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use YusufGenc34\FilamentApiForge\Services\FileUploadService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
@@ -24,6 +25,9 @@ use Spatie\QueryBuilder\AllowedSort;
 
 class ApiResourceController extends Controller
 {
+    use ExecutesApiHooks;
+    use ExtractsApiValidationRules;
+
     public function __construct(
         protected ResourceDiscoveryService $discoveryService,
     ) {}
@@ -159,7 +163,7 @@ class ApiResourceController extends Controller
         $uploadFields = array_keys($apiConfig['uploads'] ?? []);
         $modelData = array_diff_key($data, array_flip($uploadFields));
 
-        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+        $eventsEnabled = $this->eventsEnabled();
 
         // Before-create hooks and event
         $modelData = $this->executeBeforeHooks($resourceClass, 'beforeCreate', $modelData);
@@ -220,7 +224,7 @@ class ApiResourceController extends Controller
         $uploadFields = array_keys($apiConfig['uploads'] ?? []);
         $modelData = array_diff_key($data, array_flip($uploadFields));
 
-        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+        $eventsEnabled = $this->eventsEnabled();
 
         // Before-update hooks and event
         $modelData = $this->executeBeforeHooks($resourceClass, 'beforeUpdate', $record, $modelData);
@@ -268,7 +272,7 @@ class ApiResourceController extends Controller
         $resourceClass = $resource['resource_class'];
         $record = $modelClass::findOrFail($recordId);
 
-        $eventsEnabled = config('filament-api-forge.events.enabled', true);
+        $eventsEnabled = $this->eventsEnabled();
 
         // Before-delete hooks and event
         $this->executeVoidHooks($resourceClass, 'beforeDelete', $record);
@@ -354,64 +358,6 @@ class ApiResourceController extends Controller
     }
 
     /**
-     * Execute "before" style hooks that transform data.
-     */
-    protected function executeBeforeHooks(string $resourceClass, string $hook, ...$args): array
-    {
-        $eventsEnabled = config('filament-api-forge.events.enabled', true);
-
-        if (! $eventsEnabled || ! class_exists($resourceClass)) {
-            return $args[count($args) - 1];
-        }
-
-        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
-            return $resourceClass::{$hook}(...$args);
-        }
-
-        return $args[count($args) - 1];
-    }
-
-    /**
-     * Execute "after" style hooks that receive $record and $data.
-     */
-    protected function executeAfterHooks(string $resourceClass, string $hook, ...$args): void
-    {
-        if (! config('filament-api-forge.events.enabled', true) || ! class_exists($resourceClass)) {
-            return;
-        }
-
-        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
-            $resourceClass::{$hook}(...$args);
-        }
-    }
-
-    /**
-     * Execute void hooks (beforeDelete/afterDelete).
-     */
-    protected function executeVoidHooks(string $resourceClass, string $hook, ...$args): void
-    {
-        if (! config('filament-api-forge.events.enabled', true) || ! class_exists($resourceClass)) {
-            return;
-        }
-
-        if ($this->usesApiForgeHooks($resourceClass) && ! $resourceClass::shouldSkipHooks()) {
-            $resourceClass::{$hook}(...$args);
-        }
-    }
-
-    /**
-     * Check if a resource class uses the ApiForgeHooks trait.
-     */
-    protected function usesApiForgeHooks(string $resourceClass): bool
-    {
-        if (! class_exists($resourceClass)) {
-            return false;
-        }
-
-        return in_array(ApiForgeHooks::class, class_uses($resourceClass));
-    }
-
-    /**
      * Merge file upload validation rules from apiConfig into existing rules.
      */
     protected function mergeUploadRules(array $rules, array $apiConfig): array
@@ -460,63 +406,5 @@ class ApiResourceController extends Controller
         $uploadService = app(FileUploadService::class);
 
         return $uploadService->handleUploads($record, $uploads, $request);
-    }
-
-    /**
-     * Extract validation rules for a resource.
-     *
-     * Priority order:
-     *   1. apiConfig()['validation_rules'] — use if the developer has explicitly defined them
-     *   2. apiConfig()['allowed_fields']   — generate basic rules from the allowed fields
-     *   3. Model $fillable                  — last resort fallback
-     */
-    protected function extractValidationRules(string $resourceClass, bool $isUpdate = false, ?array $apiConfig = null): array
-    {
-        $apiConfig ??= $resourceClass::apiConfig();
-
-        // 1. If the developer has explicitly defined validation_rules, use them directly
-        if (! empty($apiConfig['validation_rules'])) {
-            $rules = $apiConfig['validation_rules'];
-
-            if ($isUpdate) {
-                // Make all fields optional for updates
-                return collect($rules)
-                    ->mapWithKeys(function ($rule, $field) {
-                        $ruleArray = is_array($rule) ? $rule : explode('|', $rule);
-                        array_unshift($ruleArray, 'sometimes');
-                        return [$field => $ruleArray];
-                    })
-                    ->toArray();
-            }
-
-            return $rules;
-        }
-
-        // 2. If allowed_fields is defined, use them as basic rules
-        $allowedFields = $apiConfig['allowed_fields'] ?? [];
-
-        if (! empty($allowedFields)) {
-            return collect($allowedFields)
-                ->mapWithKeys(fn (string $field) => [
-                    $field => $isUpdate ? ['sometimes'] : ['nullable'],
-                ])
-                ->toArray();
-        }
-
-        // 3. Fallback from Model $fillable
-        /** @var \Illuminate\Database\Eloquent\Model $modelClass */
-        $modelClass = $resourceClass::getModel();
-        $model      = new $modelClass();
-        $fillable   = $model->getFillable();
-
-        if (empty($fillable)) {
-            return [];
-        }
-
-        return collect($fillable)
-            ->mapWithKeys(fn (string $field) => [
-                $field => $isUpdate ? ['sometimes'] : ['nullable'],
-            ])
-            ->toArray();
     }
 }

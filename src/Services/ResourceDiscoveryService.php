@@ -97,7 +97,7 @@ class ResourceDiscoveryService
     /**
      * Get all #[ApiAction] methods for a resource class.
      *
-     * @return array<string, array{name: string, method: string, scope: string}>
+     * @return array<string, array{name: string, method: string, scope: string, record: bool}>
      */
     public function getActions(string $resourceClass): array
     {
@@ -116,6 +116,7 @@ class ResourceDiscoveryService
                         'name'   => $instance->name,
                         'method' => $instance->method,
                         'scope'  => $instance->scope,
+                        'record' => $instance->record,
                     ];
                 }
             }

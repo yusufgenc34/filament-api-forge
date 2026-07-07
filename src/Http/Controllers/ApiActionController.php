@@ -17,6 +17,9 @@ class ApiActionController extends Controller
         protected ResourceDiscoveryService $discoveryService,
     ) {}
 
+    /**
+     * Record-level action: {resource}/{id}/actions/{name}
+     */
     public function execute(Request $request, string $panelId, string $resourceSlug, string $recordId, string $actionName): JsonResponse
     {
         $resource = $this->discoveryService->findResource($panelId, $resourceSlug);
@@ -29,7 +32,6 @@ class ApiActionController extends Controller
         }
 
         $modelClass = $resource['model_class'];
-        $resourceClass = $resource['resource_class'];
 
         $record = $modelClass::find($recordId);
 
@@ -40,18 +42,35 @@ class ApiActionController extends Controller
             ], 404);
         }
 
-        $actionMethod = $this->findActionMethod($resourceClass, $actionName);
+        return $this->runAction($request, $resource['resource_class'], $actionName, $record);
+    }
 
-        if (! $actionMethod) {
+    /**
+     * Collection-level action: {resource}/actions/{name}
+     * Only matches actions declared with record: false.
+     */
+    public function executeCollection(Request $request, string $panelId, string $resourceSlug, string $actionName): JsonResponse
+    {
+        $resource = $this->discoveryService->findResource($panelId, $resourceSlug);
+
+        if (! $resource) {
             return response()->json([
-                'message' => "Action '{$actionName}' is not defined on this resource.",
-                'error'   => 'action_not_found',
+                'message' => 'Resource not found.',
+                'error'   => 'not_found',
             ], 404);
         }
 
-        $apiAction = $this->getApiActionAttribute($actionMethod, $actionName);
+        return $this->runAction($request, $resource['resource_class'], $actionName, null);
+    }
 
-        if (! $apiAction) {
+    protected function runAction(Request $request, string $resourceClass, string $actionName, mixed $record): JsonResponse
+    {
+        $expectsRecord = $record !== null;
+
+        $actionMethod = $this->findActionMethod($resourceClass, $actionName, $expectsRecord);
+        $apiAction = $actionMethod ? $this->getApiActionAttribute($actionMethod, $actionName) : null;
+
+        if (! $actionMethod || ! $apiAction || $apiAction->record !== $expectsRecord) {
             return response()->json([
                 'message' => "Action '{$actionName}' is not defined on this resource.",
                 'error'   => 'action_not_found',
@@ -79,15 +98,20 @@ class ApiActionController extends Controller
 
         $data = $request->all();
 
+        $eventsEnabled = config('filament-api-forge.events.enabled', true)
+            && config('filament-api-forge.events.dispatch_events', true);
+
         // Dispatch executing event
-        if (config('filament-api-forge.events.enabled', true)) {
+        if ($eventsEnabled) {
             ApiActionExecuting::dispatch($resourceClass, $actionName, $record, $data);
         }
 
-        $result = $actionMethod->invoke(null, $record, $data);
+        $result = $expectsRecord
+            ? $actionMethod->invoke(null, $record, $data)
+            : $actionMethod->invoke(null, $data);
 
         // Dispatch executed event
-        if (config('filament-api-forge.events.enabled', true)) {
+        if ($eventsEnabled) {
             ApiActionExecuted::dispatch($resourceClass, $actionName, $record, $result);
         }
 
@@ -98,14 +122,14 @@ class ApiActionController extends Controller
         ]);
     }
 
-    protected function findActionMethod(string $resourceClass, string $actionName): ?ReflectionMethod
+    protected function findActionMethod(string $resourceClass, string $actionName, bool $expectsRecord = true): ?ReflectionMethod
     {
         $ref = new \ReflectionClass($resourceClass);
 
         foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_STATIC) as $method) {
             $apiAction = $this->getApiActionAttribute($method, $actionName);
 
-            if ($apiAction && $apiAction->name === $actionName) {
+            if ($apiAction && $apiAction->name === $actionName && $apiAction->record === $expectsRecord) {
                 return $method;
             }
         }

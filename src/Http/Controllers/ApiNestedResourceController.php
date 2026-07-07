@@ -2,6 +2,13 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
+use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +20,8 @@ use Spatie\QueryBuilder\AllowedFilter;
 
 class ApiNestedResourceController extends Controller
 {
+    use ExecutesApiHooks;
+
     public function __construct(
         protected ResourceDiscoveryService $discoveryService,
     ) {}
@@ -42,6 +51,22 @@ class ApiNestedResourceController extends Controller
             );
         }
 
+        $allowedSorts = $relation['allowed_sorts'] ?? [];
+        if (! empty($allowedSorts)) {
+            $query->allowedSorts($allowedSorts);
+        }
+
+        // allowedFields must come before allowedIncludes (Spatie QB requirement)
+        $allowedFields = $relation['allowed_fields'] ?? [];
+        if (! empty($allowedFields)) {
+            $query->allowedFields($allowedFields);
+        }
+
+        $allowedIncludes = $relation['allowed_includes'] ?? [];
+        if (! empty($allowedIncludes)) {
+            $query->allowedIncludes($allowedIncludes);
+        }
+
         $results = $query->paginate($perPage)->appends($request->query());
 
         return ApiForgeJsonResource::collection($results)->additional([
@@ -58,7 +83,21 @@ class ApiNestedResourceController extends Controller
         if ($relation instanceof JsonResponse) return $relation;
 
         $parentModel = $parent['_record'];
-        $child = $parentModel->{$relation['relation_name']}()->findOrFail($childId);
+
+        $query = QueryBuilder::for($parentModel->{$relation['relation_name']}());
+
+        // allowedFields must come before allowedIncludes (Spatie QB requirement)
+        $allowedFields = $relation['allowed_fields'] ?? [];
+        if (! empty($allowedFields)) {
+            $query->allowedFields($allowedFields);
+        }
+
+        $allowedIncludes = $relation['allowed_includes'] ?? [];
+        if (! empty($allowedIncludes)) {
+            $query->allowedIncludes($allowedIncludes);
+        }
+
+        $child = $query->findOrFail($childId);
 
         return new ApiForgeJsonResource($child);
     }
@@ -72,9 +111,20 @@ class ApiNestedResourceController extends Controller
         if ($relation instanceof JsonResponse) return $relation;
 
         $parentModel = $parent['_record'];
+        $resourceClass = $parent['resource_class'];
         $data = $request->validate($relation['validation_rules'] ?? []);
 
+        $eventsEnabled = $this->eventsEnabled();
+
+        if ($eventsEnabled) {
+            ApiResourceCreating::dispatch($resourceClass, $data);
+        }
+
         $child = $parentModel->{$relation['relation_name']}()->create($data);
+
+        if ($eventsEnabled) {
+            ApiResourceCreated::dispatch($resourceClass, $child, $data);
+        }
 
         return (new ApiForgeJsonResource($child));
     }
@@ -88,13 +138,24 @@ class ApiNestedResourceController extends Controller
         if ($relation instanceof JsonResponse) return $relation;
 
         $parentModel = $parent['_record'];
+        $resourceClass = $parent['resource_class'];
         $child = $parentModel->{$relation['relation_name']}()->findOrFail($childId);
 
         $rules = $relation['validation_rules'] ?? [];
         $rules = collect($rules)->mapWithKeys(fn ($r, $k) => [$k => array_merge(['sometimes'], (array) $r)])->toArray();
         $data = $request->validate($rules);
 
+        $eventsEnabled = $this->eventsEnabled();
+
+        if ($eventsEnabled) {
+            ApiResourceUpdating::dispatch($resourceClass, $child, $data);
+        }
+
         $child->update($data);
+
+        if ($eventsEnabled) {
+            ApiResourceUpdated::dispatch($resourceClass, $child, $data);
+        }
 
         return new ApiForgeJsonResource($child->fresh());
     }
@@ -108,8 +169,20 @@ class ApiNestedResourceController extends Controller
         if ($relation instanceof JsonResponse) return $relation;
 
         $parentModel = $parent['_record'];
+        $resourceClass = $parent['resource_class'];
         $child = $parentModel->{$relation['relation_name']}()->findOrFail($childId);
+
+        $eventsEnabled = $this->eventsEnabled();
+
+        if ($eventsEnabled) {
+            ApiResourceDeleting::dispatch($resourceClass, $child);
+        }
+
         $child->delete();
+
+        if ($eventsEnabled) {
+            ApiResourceDeleted::dispatch($resourceClass, $child);
+        }
 
         return response()->json(['message' => 'Resource deleted successfully.', 'deleted' => true]);
     }

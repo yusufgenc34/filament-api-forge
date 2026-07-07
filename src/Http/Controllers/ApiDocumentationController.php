@@ -252,6 +252,193 @@ class ApiDocumentationController extends Controller
             if (!empty($itemOps)) {
                 $paths[$item] = $itemOps;
             }
+
+            // ── Custom action endpoints ───────────────────────────────────
+            $actionsPrefix = config('filament-api-forge.actions.prefix', 'actions');
+
+            foreach ($this->discoveryService->getActions($resourceClass) as $action) {
+                $httpMethod = strtolower($action['method']);
+                $isRecord   = $action['record'] ?? true;
+
+                $actionPath = $isRecord
+                    ? "{$item}/{$actionsPrefix}/{$action['name']}"
+                    : "{$base}/{$actionsPrefix}/{$action['name']}";
+
+                $paths[$actionPath][$httpMethod] = [
+                    'tags'        => [$plural],
+                    'summary'     => Str::headline($action['name']) . " — {$label}",
+                    'operationId' => Str::camel($action['name']) . Str::studly($label) . 'Action',
+                    'description' => "Custom action. Requires the **{$action['scope']}** scope.",
+                    'parameters'  => $isRecord ? [$idParam] : [],
+                    'responses'   => [
+                        '200' => [
+                            'description' => "Action '{$action['name']}' executed successfully.",
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'message' => ['type' => 'string'],
+                                    'action'  => ['type' => 'string', 'example' => $action['name']],
+                                    'result'  => ['description' => 'Value returned by the action method.'],
+                                ],
+                            ]]],
+                        ],
+                        '404' => ['$ref' => '#/components/responses/NotFound'],
+                        '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                        '403' => ['$ref' => '#/components/responses/Forbidden'],
+                    ],
+                    'security' => $sec,
+                ];
+            }
+
+            // ── Batch endpoint ────────────────────────────────────────────
+            $batchEnabled = $res['api_config']['batch']['enabled']
+                ?? config('filament-api-forge.batch.enabled', true);
+
+            if ($batchEnabled) {
+                $rowRef = ['$ref' => "#/components/schemas/{$schemaName}"];
+
+                $paths["{$base}/batch"]['post'] = [
+                    'tags'        => [$plural],
+                    'summary'     => "Batch operations — {$plural}",
+                    'operationId' => 'batch' . Str::studly($plural),
+                    'description' => 'Transaction-wrapped bulk create, update and delete.',
+                    'requestBody' => [
+                        'required' => true,
+                        'content'  => ['application/json' => ['schema' => [
+                            'type'       => 'object',
+                            'properties' => [
+                                'create' => ['type' => 'array', 'items' => $rowRef],
+                                'update' => ['type' => 'array', 'items' => $rowRef],
+                                'delete' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                            ],
+                        ]]],
+                    ],
+                    'responses' => [
+                        '200' => [
+                            'description' => 'Batch operation completed.',
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'message' => ['type' => 'string', 'example' => 'Batch operation completed.'],
+                                    'created' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                                    'updated' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                                    'deleted' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                                    'failed'  => ['type' => 'array', 'items' => ['type' => 'object']],
+                                ],
+                            ]]],
+                        ],
+                        '422' => ['$ref' => '#/components/responses/ValidationError'],
+                        '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                        '403' => ['$ref' => '#/components/responses/Forbidden'],
+                    ],
+                    'security' => $sec,
+                ];
+            }
+
+            // ── Nested resource endpoints ─────────────────────────────────
+            foreach ($res['api_config']['relations'] ?? [] as $childSlug => $relation) {
+                $childAllowed = $relation['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
+                $childBase    = "{$item}/{$childSlug}";
+                $childItem    = "{$childBase}/{childId}";
+                $childLabel   = Str::headline(Str::singular($childSlug));
+                $childIdParam = [
+                    'name'        => 'childId',
+                    'in'          => 'path',
+                    'required'    => true,
+                    'schema'      => ['type' => 'string'],
+                    'description' => "The {$childLabel} ID.",
+                ];
+                $genericChild = ['type' => 'object', 'description' => "{$childLabel} attributes."];
+                $childOpId    = Str::studly($label) . Str::studly($childSlug);
+
+                $nestedResponses = [
+                    '404' => ['$ref' => '#/components/responses/NotFound'],
+                    '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                    '403' => ['$ref' => '#/components/responses/Forbidden'],
+                ];
+
+                if (in_array('index', $childAllowed)) {
+                    $paths[$childBase]['get'] = [
+                        'tags'        => [$plural],
+                        'summary'     => "List {$childSlug} of {$label}",
+                        'operationId' => 'list' . $childOpId,
+                        'parameters'  => [$idParam],
+                        'responses'   => ['200' => [
+                            'description' => "Paginated {$childSlug} of the {$label}.",
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'data'  => ['type' => 'array', 'items' => $genericChild],
+                                    'meta'  => ['$ref' => '#/components/schemas/PaginationMeta'],
+                                    'links' => ['$ref' => '#/components/schemas/PaginationLinks'],
+                                ],
+                            ]]],
+                        ]] + $nestedResponses,
+                        'security' => $sec,
+                    ];
+                }
+
+                if (in_array('store', $childAllowed)) {
+                    $paths[$childBase]['post'] = [
+                        'tags'        => [$plural],
+                        'summary'     => "Create {$childLabel} for {$label}",
+                        'operationId' => 'create' . $childOpId,
+                        'parameters'  => [$idParam],
+                        'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => $genericChild]]],
+                        'responses'   => ['200' => [
+                            'description' => "The created {$childLabel}.",
+                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                        ], '422' => ['$ref' => '#/components/responses/ValidationError']] + $nestedResponses,
+                        'security' => $sec,
+                    ];
+                }
+
+                if (in_array('show', $childAllowed)) {
+                    $paths[$childItem]['get'] = [
+                        'tags'        => [$plural],
+                        'summary'     => "Get {$childLabel} of {$label}",
+                        'operationId' => 'get' . $childOpId,
+                        'parameters'  => [$idParam, $childIdParam],
+                        'responses'   => ['200' => [
+                            'description' => "The {$childLabel}.",
+                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                        ]] + $nestedResponses,
+                        'security' => $sec,
+                    ];
+                }
+
+                if (in_array('update', $childAllowed)) {
+                    $paths[$childItem]['put'] = [
+                        'tags'        => [$plural],
+                        'summary'     => "Update {$childLabel} of {$label}",
+                        'operationId' => 'update' . $childOpId,
+                        'parameters'  => [$idParam, $childIdParam],
+                        'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => $genericChild]]],
+                        'responses'   => ['200' => [
+                            'description' => "The updated {$childLabel}.",
+                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                        ], '422' => ['$ref' => '#/components/responses/ValidationError']] + $nestedResponses,
+                        'security' => $sec,
+                    ];
+                }
+
+                if (in_array('destroy', $childAllowed)) {
+                    $paths[$childItem]['delete'] = [
+                        'tags'        => [$plural],
+                        'summary'     => "Delete {$childLabel} of {$label}",
+                        'operationId' => 'delete' . $childOpId,
+                        'parameters'  => [$idParam, $childIdParam],
+                        'responses'   => ['200' => [
+                            'description' => "{$childLabel} deleted successfully.",
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => ['message' => ['type' => 'string'], 'deleted' => ['type' => 'boolean']],
+                            ]]],
+                        ]] + $nestedResponses,
+                        'security' => $sec,
+                    ];
+                }
+            }
         }
 
         // ── 2. MANUAL APP API ROUTES ──────────────────────────────────────
