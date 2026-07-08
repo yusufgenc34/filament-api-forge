@@ -27,6 +27,7 @@ class NotifyExpiringTokensCommand extends Command
             ->get();
 
         $notified = 0;
+        $failed   = 0;
 
         foreach ($tokens as $token) {
             $user = $token->user;
@@ -35,14 +36,22 @@ class NotifyExpiringTokensCommand extends Command
                 continue;
             }
 
-            $user->notify(new ApiForgeTokenExpiringNotification($token));
+            try {
+                $user->notify(new ApiForgeTokenExpiringNotification($token));
 
-            $token->forceFill(['expiry_notified_at' => now()])->save();
-            $notified++;
+                $token->forceFill(['expiry_notified_at' => now()])->save();
+                $notified++;
+            } catch (\Throwable $e) {
+                // A failing channel must not abort the run or re-send
+                // already-delivered notifications on the next attempt.
+                $failed++;
+                $this->warn("Failed to notify owner of token '{$token->name}': {$e->getMessage()}");
+            }
         }
 
-        $this->info("Notified {$notified} token owner(s) about upcoming expiry (window: {$days} days).");
+        $this->info("Notified {$notified} token owner(s) about upcoming expiry (window: {$days} days)."
+            . ($failed > 0 ? " {$failed} failed." : ''));
 
-        return self::SUCCESS;
+        return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }
 }
