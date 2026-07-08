@@ -290,6 +290,82 @@ class ApiDocumentationController extends Controller
                 ];
             }
 
+            // ── Soft delete endpoints ─────────────────────────────────────
+            if (in_array('restore', $allowed)) {
+                $paths["{$item}/restore"]['post'] = [
+                    'tags'        => [$plural],
+                    'summary'     => "Restore {$label}",
+                    'operationId' => 'restore' . Str::studly($label),
+                    'description' => 'Restore a soft-deleted record. Requires the **write** scope.',
+                    'parameters'  => [$idParam],
+                    'responses'   => [
+                        '200' => [
+                            'description' => "The restored {$label}.",
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => ['data' => ['$ref' => "#/components/schemas/{$schemaName}"]],
+                            ]]],
+                        ],
+                        '404' => ['$ref' => '#/components/responses/NotFound'],
+                        '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                        '403' => ['$ref' => '#/components/responses/Forbidden'],
+                    ],
+                    'security' => $sec,
+                ];
+            }
+
+            if (in_array('forceDelete', $allowed)) {
+                $paths["{$item}/force"]['delete'] = [
+                    'tags'        => [$plural],
+                    'summary'     => "Permanently delete {$label}",
+                    'operationId' => 'forceDelete' . Str::studly($label),
+                    'description' => 'Permanently delete a (soft-deleted) record. Requires the **delete** scope.',
+                    'parameters'  => [$idParam],
+                    'responses'   => [
+                        '200' => [
+                            'description' => "{$label} permanently deleted.",
+                            'content'     => ['application/json' => ['schema' => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'message' => ['type' => 'string', 'example' => 'Resource permanently deleted.'],
+                                    'deleted' => ['type' => 'boolean'],
+                                ],
+                            ]]],
+                        ],
+                        '404' => ['$ref' => '#/components/responses/NotFound'],
+                        '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                        '403' => ['$ref' => '#/components/responses/Forbidden'],
+                    ],
+                    'security' => $sec,
+                ];
+            }
+
+            // ── Export endpoint ───────────────────────────────────────────
+            if (in_array('export', $allowed) && config('filament-api-forge.export.enabled', true)) {
+                $paths["{$base}/export"]['get'] = [
+                    'tags'        => [$plural],
+                    'summary'     => "Export {$plural}",
+                    'operationId' => 'export' . Str::studly($plural),
+                    'description' => 'Export the filtered result set as CSV or JSON. Requires the **read** scope.',
+                    'parameters'  => array_merge(
+                        [[
+                            'name'     => 'format',
+                            'in'       => 'query',
+                            'required' => false,
+                            'schema'   => ['type' => 'string', 'enum' => config('filament-api-forge.export.formats', ['csv', 'json']), 'default' => 'csv'],
+                        ]],
+                        $this->listParams($res),
+                    ),
+                    'responses' => [
+                        '200' => ['description' => 'The exported rows (CSV stream or JSON payload).'],
+                        '422' => ['$ref' => '#/components/responses/ValidationError'],
+                        '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                        '403' => ['$ref' => '#/components/responses/Forbidden'],
+                    ],
+                    'security' => $sec,
+                ];
+            }
+
             // ── Batch endpoint ────────────────────────────────────────────
             $batchEnabled = $res['api_config']['batch']['enabled']
                 ?? config('filament-api-forge.batch.enabled', true);

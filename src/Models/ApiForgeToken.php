@@ -32,28 +32,33 @@ class ApiForgeToken extends Model
 
     protected $fillable = [
         'user_id',
+        'tenant_id',
         'name',
         'token_hash',
         'token_prefix',
+        'refresh_token_hash',
         'scopes',
         'allowed_resources',
         'expires_at',
         'last_used_at',
+        'expiry_notified_at',
         'request_count',
         'is_active',
     ];
 
     protected $casts = [
-        'scopes'            => 'array',
-        'allowed_resources' => 'array',
-        'expires_at'        => 'datetime',
-        'last_used_at'      => 'datetime',
-        'is_active'         => 'boolean',
-        'request_count'     => 'integer',
+        'scopes'             => 'array',
+        'allowed_resources'  => 'array',
+        'expires_at'         => 'datetime',
+        'last_used_at'       => 'datetime',
+        'expiry_notified_at' => 'datetime',
+        'is_active'          => 'boolean',
+        'request_count'      => 'integer',
     ];
 
     protected $hidden = [
         'token_hash',
+        'refresh_token_hash',
     ];
 
     public function user(): BelongsTo

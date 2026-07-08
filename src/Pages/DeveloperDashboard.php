@@ -29,6 +29,8 @@ class DeveloperDashboard extends Page
     public string $formattedTotalRequests = '0';
     public string $apiBaseUrl      = '';
     public string $apiVersion      = '';
+    public array  $recentRequests  = [];
+    public ?int   $avgResponseMs   = null;
 
     public function getMaxContentWidth(): Width | string | null
     {
@@ -57,6 +59,37 @@ class DeveloperDashboard extends Page
         $this->formattedTotalRequests = self::abbreviateCount($this->totalRequests);
 
         $this->treeResources = $this->discoverAllForTree();
+
+        $this->loadAuditStats();
+    }
+
+    protected function loadAuditStats(): void
+    {
+        if (! config('filament-api-forge.audit.enabled', true)
+            || ! \Illuminate\Support\Facades\Schema::hasTable('api_forge_request_logs')) {
+            return;
+        }
+
+        $this->recentRequests = \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::query()
+            ->latest('created_at')
+            ->limit(8)
+            ->get()
+            ->map(fn ($log) => [
+                'method'      => $log->method,
+                'path'        => $log->path,
+                'action'      => $log->action,
+                'status'      => $log->status,
+                'duration_ms' => $log->duration_ms,
+                'ip'          => $log->ip,
+                'when'        => $log->created_at?->diffForHumans(short: true),
+            ])
+            ->all();
+
+        $avg = \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::query()
+            ->where('created_at', '>=', now()->subDay())
+            ->avg('duration_ms');
+
+        $this->avgResponseMs = $avg !== null ? (int) round($avg) : null;
     }
 
     protected function discoverAllForTree(): array

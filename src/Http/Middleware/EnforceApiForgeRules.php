@@ -78,7 +78,11 @@ class EnforceApiForgeRules
 
         RateLimiter::hit($key, 60);
 
+        $startedAt = microtime(true);
+
         $response = $next($request);
+
+        $this->recordAuditLog($request, $resourceClass, $action, $response, $startedAt);
 
         $remaining = RateLimiter::remaining($key, $limit);
 
@@ -87,12 +91,52 @@ class EnforceApiForgeRules
             ->header('X-RateLimit-Remaining', max(0, $remaining));
     }
 
+    private function recordAuditLog(Request $request, string $resourceClass, string $action, mixed $response, float $startedAt): void
+    {
+        if (! config('filament-api-forge.audit.enabled', true)) {
+            return;
+        }
+
+        try {
+            $token = $request->attributes->get('api_forge_token');
+
+            \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::create([
+                'token_id'       => $token?->id,
+                'resource_class' => $resourceClass,
+                'action'         => substr($action, 0, 64),
+                'method'         => substr($request->method(), 0, 10),
+                'path'           => substr($request->path(), 0, 2048),
+                'status'         => method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 0,
+                'duration_ms'    => (int) round((microtime(true) - $startedAt) * 1000),
+                'ip'             => $request->ip(),
+                'created_at'     => now(),
+            ]);
+        } catch (\Throwable) {
+            // Audit logging must never break the API response
+        }
+    }
+
     private function resolveAction(Request $request): string
     {
         // Custom action detection
         $actionName = $request->route('actionName');
         if ($actionName) {
             return 'action.' . $actionName;
+        }
+
+        // Literal-suffix routes (restore / force delete / export)
+        $routeName = $request->route()?->getName();
+
+        $named = match ($routeName) {
+            'api-forge.restore'       => 'restore',
+            'api-forge.force-destroy' => 'forceDelete',
+            'api-forge.export'        => 'export',
+            'api-forge.batch'         => 'batch',
+            default                   => null,
+        };
+
+        if ($named) {
+            return $named;
         }
 
         $method = strtoupper($request->method());
@@ -146,20 +190,41 @@ class EnforceApiForgeRules
         [$subnet, $bits] = explode('/', $cidr, 2);
         $bits = (int) $bits;
 
-        // IPv6 ranges are not handled here yet — skip gracefully
-        if (str_contains($ip, ':') || str_contains($subnet, ':')) {
+        $ipBin     = @inet_pton($ip);
+        $subnetBin = @inet_pton($subnet);
+
+        if ($ipBin === false || $subnetBin === false) {
             return false;
         }
 
-        $ipLong     = ip2long($ip);
-        $subnetLong = ip2long($subnet);
-
-        if ($ipLong === false || $subnetLong === false) {
+        // Mixed families (IPv4 rule vs IPv6 client or vice versa) never match
+        if (strlen($ipBin) !== strlen($subnetBin)) {
             return false;
         }
 
-        $mask = $bits === 0 ? 0 : (~0 << (32 - $bits));
+        $maxBits = strlen($ipBin) * 8; // 32 for IPv4, 128 for IPv6
 
-        return ($ipLong & $mask) === ($subnetLong & $mask);
+        if ($bits < 0 || $bits > $maxBits) {
+            return false;
+        }
+
+        if ($bits === 0) {
+            return true;
+        }
+
+        $fullBytes = intdiv($bits, 8);
+        $remainder = $bits % 8;
+
+        if ($fullBytes > 0 && substr($ipBin, 0, $fullBytes) !== substr($subnetBin, 0, $fullBytes)) {
+            return false;
+        }
+
+        if ($remainder === 0) {
+            return true;
+        }
+
+        $mask = 0xFF << (8 - $remainder) & 0xFF;
+
+        return (ord($ipBin[$fullBytes]) & $mask) === (ord($subnetBin[$fullBytes]) & $mask);
     }
 }

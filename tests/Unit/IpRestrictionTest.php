@@ -64,6 +64,9 @@ it('skips empty string rules', function () {
     )->toBeTrue();
 });
 
-it('returns false for IPv6 addresses in CIDR check', function () {
-    expect(callPrivateMethod($this->middleware, 'ipInCidr', ['::1', '::1/128']))->toBeFalse();
+it('matches IPv6 addresses in CIDR check', function () {
+    expect(callPrivateMethod($this->middleware, 'ipInCidr', ['::1', '::1/128']))->toBeTrue()
+        ->and(callPrivateMethod($this->middleware, 'ipInCidr', ['2001:db8::5', '2001:db8::/32']))->toBeTrue()
+        ->and(callPrivateMethod($this->middleware, 'ipInCidr', ['2001:db9::5', '2001:db8::/32']))->toBeFalse()
+        ->and(callPrivateMethod($this->middleware, 'ipInCidr', ['192.168.1.1', '2001:db8::/32']))->toBeFalse();
 });

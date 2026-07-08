@@ -491,4 +491,45 @@ $pathMap = [
     </div>
 
 </div>
+
+{{-- Recent API requests (audit log) --}}
+@if (! empty($recentRequests))
+<div style="margin-top: 24px; background: var(--af-card-bg, rgba(255,255,255,0.04));
+            border: 1px solid var(--af-border, rgba(148,163,184,0.15)); border-radius: 12px; padding: 24px;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 14px;">
+        <div style="font-size:14px; font-weight:600;">Recent API Requests</div>
+        @if ($avgResponseMs !== null)
+            <div style="font-size:12px; color:#64748b;">avg response (24h): <strong>{{ $avgResponseMs }} ms</strong></div>
+        @endif
+    </div>
+    <table style="width:100%; font-size:12.5px; border-collapse:collapse;">
+        <thead>
+            <tr style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">
+                <th style="text-align:left; padding:6px 8px;">Method</th>
+                <th style="text-align:left; padding:6px 8px;">Path</th>
+                <th style="text-align:left; padding:6px 8px;">Action</th>
+                <th style="text-align:left; padding:6px 8px;">Status</th>
+                <th style="text-align:left; padding:6px 8px;">Duration</th>
+                <th style="text-align:left; padding:6px 8px;">IP</th>
+                <th style="text-align:left; padding:6px 8px;">When</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($recentRequests as $req)
+                <tr style="border-top:1px solid rgba(148,163,184,0.12);">
+                    <td style="padding:7px 8px; font-weight:600;">{{ $req['method'] }}</td>
+                    <td style="padding:7px 8px; font-family:ui-monospace,monospace; word-break:break-all;">{{ $req['path'] }}</td>
+                    <td style="padding:7px 8px; color:#64748b;">{{ $req['action'] }}</td>
+                    <td style="padding:7px 8px;">
+                        <span style="font-weight:600; color: {{ $req['status'] < 400 ? '#10b981' : '#f43f5e' }};">{{ $req['status'] }}</span>
+                    </td>
+                    <td style="padding:7px 8px;">{{ $req['duration_ms'] }} ms</td>
+                    <td style="padding:7px 8px; color:#64748b;">{{ $req['ip'] }}</td>
+                    <td style="padding:7px 8px; color:#64748b;">{{ $req['when'] }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
 </x-filament-panels::page>

@@ -47,24 +47,24 @@ class ApiNestedResourceController extends Controller
         $allowedFilters = $relation['allowed_filters'] ?? [];
         if (! empty($allowedFilters)) {
             $query->allowedFilters(
-                collect($allowedFilters)->map(fn (string $f) => AllowedFilter::partial($f))->toArray()
+                ...collect($allowedFilters)->map(fn (string $f) => AllowedFilter::partial($f))->all()
             );
         }
 
         $allowedSorts = $relation['allowed_sorts'] ?? [];
         if (! empty($allowedSorts)) {
-            $query->allowedSorts($allowedSorts);
+            $query->allowedSorts(...$allowedSorts);
         }
 
         // allowedFields must come before allowedIncludes (Spatie QB requirement)
         $allowedFields = $relation['allowed_fields'] ?? [];
         if (! empty($allowedFields)) {
-            $query->allowedFields($allowedFields);
+            $query->allowedFields(...$allowedFields);
         }
 
         $allowedIncludes = $relation['allowed_includes'] ?? [];
         if (! empty($allowedIncludes)) {
-            $query->allowedIncludes($allowedIncludes);
+            $query->allowedIncludes(...$allowedIncludes);
         }
 
         $results = $query->paginate($perPage)->appends($request->query());
@@ -89,12 +89,12 @@ class ApiNestedResourceController extends Controller
         // allowedFields must come before allowedIncludes (Spatie QB requirement)
         $allowedFields = $relation['allowed_fields'] ?? [];
         if (! empty($allowedFields)) {
-            $query->allowedFields($allowedFields);
+            $query->allowedFields(...$allowedFields);
         }
 
         $allowedIncludes = $relation['allowed_includes'] ?? [];
         if (! empty($allowedIncludes)) {
-            $query->allowedIncludes($allowedIncludes);
+            $query->allowedIncludes(...$allowedIncludes);
         }
 
         $child = $query->findOrFail($childId);
@@ -189,6 +189,9 @@ class ApiNestedResourceController extends Controller
 
     protected function resolveParent(string $panelId, string $resourceSlug, string $recordId): array|JsonResponse
     {
+        // Parent-level transformers do not apply to child records
+        ApiForgeJsonResource::withTransformer(null);
+
         $resource = $this->discoveryService->findResource($panelId, $resourceSlug);
 
         if (! $resource) {

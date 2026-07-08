@@ -6,6 +6,7 @@ use YusufGenc34\FilamentApiForge\Pages\AccessControl;
 use YusufGenc34\FilamentApiForge\Pages\ApiDocumentation;
 use YusufGenc34\FilamentApiForge\Pages\ApiSettings;
 use YusufGenc34\FilamentApiForge\Pages\DeveloperDashboard;
+use YusufGenc34\FilamentApiForge\Pages\Webhooks;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
@@ -14,6 +15,7 @@ class FilamentApiForgePlugin implements Plugin
     protected bool $hasApiKeys   = true;
     protected bool $hasDocs      = true;
     protected bool $hasDashboard = true;
+    protected bool $hasWebhooks  = true;
 
     public static function make(): static
     {
@@ -50,6 +52,12 @@ class FilamentApiForgePlugin implements Plugin
         return $this;
     }
 
+    public function webhooks(bool $condition = true): static
+    {
+        $this->hasWebhooks = $condition;
+        return $this;
+    }
+
     public function register(Panel $panel): void
     {
         $resources = [];
@@ -64,6 +72,7 @@ class FilamentApiForgePlugin implements Plugin
             $pages[] = ApiSettings::class;
         }
         if ($this->hasDashboard) $pages[] = DeveloperDashboard::class;
+        if ($this->hasWebhooks)  $pages[] = Webhooks::class;
 
         $panel->resources($resources)->pages($pages);
     }

@@ -3,8 +3,10 @@
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiActionController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiBatchController;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiExportController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiNestedResourceController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiTokenController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,9 +26,23 @@ use Illuminate\Support\Facades\Route;
 
 $actionsPrefix = config('filament-api-forge.actions.prefix', 'actions');
 
+// Token self-service (literal 'auth' prefix — must precede all wildcards)
+Route::post('auth/token/rotate', [ApiTokenController::class, 'rotate'])
+    ->name('api-forge.token.rotate');
+
 // Batch operations (3 segments, literal 'batch')
 Route::post('{panelId}/{resourceSlug}/batch', [ApiBatchController::class, 'batch'])
     ->name('api-forge.batch');
+
+// Export (3 segments, literal 'export' — must precede show wildcard)
+Route::get('{panelId}/{resourceSlug}/export', [ApiExportController::class, 'export'])
+    ->name('api-forge.export');
+
+// Soft delete endpoints (literal suffixes — must precede nested wildcards)
+Route::post('{panelId}/{resourceSlug}/{recordId}/restore', [ApiResourceController::class, 'restore'])
+    ->name('api-forge.restore');
+Route::delete('{panelId}/{resourceSlug}/{recordId}/force', [ApiResourceController::class, 'forceDestroy'])
+    ->name('api-forge.force-destroy');
 
 // Collection-level custom actions (4 segments, literal prefix)
 Route::match(

@@ -49,4 +49,24 @@ trait ApiForgeHooks
     {
         //
     }
+
+    public static function beforeRestore(Model $record): void
+    {
+        //
+    }
+
+    public static function afterRestore(Model $record): void
+    {
+        //
+    }
+
+    public static function beforeForceDelete(Model $record): void
+    {
+        //
+    }
+
+    public static function afterForceDelete(Model $record): void
+    {
+        //
+    }
 }

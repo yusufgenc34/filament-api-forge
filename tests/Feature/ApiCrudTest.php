@@ -136,10 +136,13 @@ it('controller scope map maps HTTP methods correctly', function () {
     $scopeMap = $ref->getConstant('SCOPE_MAP');
 
     expect($scopeMap)->toBe([
-        'index'   => 'read',
-        'show'    => 'read',
-        'store'   => 'write',
-        'update'  => 'write',
-        'destroy' => 'delete',
+        'index'       => 'read',
+        'show'        => 'read',
+        'export'      => 'read',
+        'store'       => 'write',
+        'update'      => 'write',
+        'restore'     => 'write',
+        'destroy'     => 'delete',
+        'forceDelete' => 'delete',
     ]);
 });

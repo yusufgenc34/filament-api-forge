@@ -51,6 +51,18 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 | **Custom Actions** | Expose domain actions (`publish`, `archive`, …) as endpoints with a single `#[ApiAction]` attribute |
 | **Nested Resources** | Full CRUD on child relations (`/posts/1/comments`) with scoped binding and per-relation rules |
 | **Batch Operations** | Transaction-wrapped bulk create/update/delete in a single request |
+| **Soft Deletes** | `restore` / `forceDelete` endpoints and `?trashed=only\|with` filters for `SoftDeletes` models |
+| **Export** | Stream the filtered result set as CSV or JSON from `GET {resource}/export` |
+| **Response Transformation** | Reshape API output per resource with a single `apiTransform()` method |
+| **Custom Scopes** | Require arbitrary scopes per method via `scope_map` — beyond `read`/`write`/`delete` |
+| **Token Refresh & Rotation** | `forge_refresh_` tokens, `auth/token/refresh` + `auth/token/rotate` endpoints |
+| **Expiry Notifications** | `api-forge:notify-expiring` warns token owners by mail + database notification |
+| **Audit Log** | Every request logged (token, action, status, duration, IP) with dashboard view + prune command |
+| **Response Cache** | Config-gated caching of GET responses, auto-invalidated on any write |
+| **Webhooks** | Signed HTTP callbacks on API writes, managed from a dedicated panel page |
+| **Multi-Tenancy** | Tenant-bound tokens automatically scope queries and stamp created records |
+| **API Versioning** | Multi-version routing (`/api/v1`, `/api/v2`) with per-resource `#[ApiVersion]` |
+| **GraphQL** | Optional `/graphql` endpoint with a schema generated from your resources |
 | **OpenAPI Docs** | Dynamically generated OpenAPI 3.0 spec with interactive Swagger UI |
 | **Public Docs** | Publish your API docs to a standalone public URL with a single click — light/dark mode included |
 | **Route Segment** | Replace the panel ID in API paths with a custom segment (e.g. `/filament/posts`) |
@@ -64,8 +76,9 @@ Automatically expose your **Filament Resources** as fully-featured REST APIs —
 - PHP **8.2+**
 - Laravel **12+**
 - Filament **5.x**
-- Spatie Laravel Query Builder **5+**
+- Spatie Laravel Query Builder **5, 6 or 7**
 - Spatie Media Library **11+** _(optional — enables media collections for file uploads)_
+- webonyx/graphql-php **15+** _(optional — enables the GraphQL endpoint)_
 
 ---
 
@@ -164,6 +177,10 @@ class PostResource extends Resource implements HasApi
 | `uploads` | `array` | File upload fields — see [File Uploads](#file-uploads) |
 | `relations` | `array` | Nested child resources — see [Nested Resources](#nested-resources) |
 | `batch` | `array` | Per-resource batch overrides (`max_size`, `allowed_operations`) — see [Batch Operations](#batch-operations) |
+| `scope_map` | `array` | Custom scope per method, e.g. `['show' => 'posts:read']` — see [Custom Scopes](#custom-scopes) |
+| `tenant_column` | `string` | Column used to scope queries to the token's tenant — see [Multi-Tenancy](#multi-tenancy) |
+
+> `allowed_methods` also accepts `export`, `restore` and `forceDelete` to expose the [export](#export) and [soft delete](#soft-deletes) endpoints.
 
 ### 3. Enrich the OpenAPI Docs (optional)
 
@@ -217,6 +234,53 @@ Tokens use the `forge_` prefix followed by 40 random characters (238 bits of ent
 | `*` | Full access |
 
 Tokens can also be restricted to specific resources via **Resource Access** in the API Keys page.
+
+### Custom Scopes
+
+Scopes are plain strings — you can grant any custom scope to a token and require it per method with `scope_map` in `apiConfig()`:
+
+```php
+'scope_map' => [
+    'show'    => 'posts:read',
+    'destroy' => 'posts:admin',
+],
+```
+
+Methods not listed in `scope_map` fall back to the default `read`/`write`/`delete` mapping. `#[ApiAction]` attributes accept custom scopes the same way.
+
+### Token Refresh & Rotation
+
+Enable refresh tokens to allow renewing access without re-issuing keys manually:
+
+```env
+API_FORGE_REFRESH_TOKENS=true
+```
+
+Tokens created while enabled also return a one-time `forge_refresh_` token. Exchange it at any time — even after the access token expired:
+
+```bash
+POST /api/v1/auth/token/refresh
+{"refresh_token": "forge_refresh_..."}
+# → {"token": "forge_...", "refresh_token": "forge_refresh_...", "expires_at": "..."}
+```
+
+Both tokens are rotated on every refresh. An authenticated client can also rotate its access token in place:
+
+```bash
+POST /api/v1/auth/token/rotate
+Authorization: Bearer forge_...
+# → {"token": "forge_...", "expires_at": "..."}   (old token stops working immediately)
+```
+
+### Expiry Notifications
+
+Warn token owners before their tokens expire (mail + Filament database notification, channels configurable):
+
+```bash
+php artisan api-forge:notify-expiring --days=7
+```
+
+Schedule it daily; each token is only notified once per expiry window.
 
 ---
 
@@ -555,6 +619,179 @@ Every row goes through the full Eloquent pipeline: `validation_rules` are applie
 
 ---
 
+## Soft Deletes
+
+For models using the `SoftDeletes` trait, opt into the extra endpoints by listing them in `allowed_methods`:
+
+```php
+'allowed_methods' => ['index', 'show', 'store', 'update', 'destroy', 'restore', 'forceDelete'],
+```
+
+```bash
+GET    /api/v1/admin/posts?trashed=only     # only trashed records
+GET    /api/v1/admin/posts?trashed=with     # trashed + live records
+POST   /api/v1/admin/posts/1/restore        # restore (write scope)
+DELETE /api/v1/admin/posts/1/force          # permanent delete (delete scope)
+```
+
+`restore`/`forceDelete` fire their own hooks (`beforeRestore`, `afterForceDelete`, …) and events (`ApiResourceRestored`, `ApiResourceForceDeleted`, …). Calling them on a non-soft-deletable model returns `405`.
+
+---
+
+## Export
+
+Add `export` to `allowed_methods` to stream the full (filtered, sorted, searched) result set:
+
+```bash
+GET /api/v1/admin/posts/export                          # CSV download
+GET /api/v1/admin/posts/export?format=json              # JSON payload
+GET /api/v1/admin/posts/export?filter[status]=published # honors all index query params
+```
+
+Columns follow `allowed_fields` when declared, otherwise `id` + `$fillable` (+ timestamps). Row count is capped by `export.max_rows` (default 10 000). Requires the **read** scope.
+
+---
+
+## Response Transformation
+
+Define `apiTransform()` on a Resource to reshape every serialized record — single responses and collections alike:
+
+```php
+public static function apiTransform(Model $record, array $data): array
+{
+    $data['title'] = strtoupper($data['title']);
+    unset($data['internal_notes']);
+
+    return $data;
+}
+```
+
+The transformer runs after Spatie field selection, on every REST endpoint of that resource.
+
+---
+
+## Audit Log
+
+Every API request is logged to `api_forge_request_logs` — token, resource, action, status, duration and IP. The Developer Center dashboard shows the most recent requests and the 24-hour average response time.
+
+```bash
+php artisan api-forge:prune-logs --days=30   # schedule this to keep the table lean
+```
+
+Disable with `audit.enabled` (or `API_FORGE_AUDIT=false`). Logging failures never break API responses.
+
+---
+
+## Response Cache
+
+Cache successful GET responses (index/show, top-level and nested):
+
+```env
+API_FORGE_CACHE=true
+```
+
+Cache entries vary by full URL and token, live for `cache.ttl` seconds and are **invalidated instantly** when the resource changes — every create/update/delete/restore/force-delete/custom action (including batch and nested writes) bumps the resource's cache version. Responses carry an `X-ApiForge-Cache: hit|miss` header. Rate limiting and audit logging still apply to cache hits.
+
+---
+
+## Webhooks
+
+Register HTTP callbacks from **Developer Center → Webhooks** (or the `ApiForgeWebhook` model). Each webhook chooses its events (`created`, `updated`, `deleted`, `restored`, `force_deleted`, `action_executed` or `*`) and optionally a single resource.
+
+Deliveries are queued jobs with 3 retries and exponential backoff. When a secret is set, the JSON payload is signed:
+
+```
+X-ApiForge-Event: created
+X-ApiForge-Signature: sha256=<hmac-sha256 of the raw body>
+```
+
+```json
+{
+  "event": "created",
+  "resource": "PostResource",
+  "resource_class": "App\\Filament\\Resources\\PostResource",
+  "timestamp": "2026-07-08T12:00:00+00:00",
+  "record": { "id": 42, "attributes": { "title": "Hello" } }
+}
+```
+
+Hide the panel page with `FilamentApiForgePlugin::make()->webhooks(false)`; disable dispatching entirely with `webhooks.enabled`.
+
+---
+
+## Multi-Tenancy
+
+Bind a token to a tenant and declare which column scopes the resource:
+
+```php
+// Token creation (ApiForgeTokenService::create)
+['name' => 'Acme token', 'tenant_id' => 'acme', ...]
+
+// Resource
+public static function apiConfig(): array
+{
+    return [
+        // ...
+        'tenant_column' => 'tenant_id',
+    ];
+}
+```
+
+When both are present, every query (index, show, update, delete, restore, force, export, GraphQL) is constrained to the token's tenant, and created records are stamped with it automatically. Tokens without a `tenant_id` see everything — ideal for admin keys.
+
+---
+
+## API Versioning
+
+Single-version mode (default) uses `api_prefix`. To serve multiple versions side by side:
+
+```php
+// config/filament-api-forge.php
+'versions' => ['v1', 'v2'],
+'api_base' => 'api',
+```
+
+Routes are registered under `/api/v1/...` and `/api/v2/...`. Resources are available in every version unless restricted:
+
+```php
+use YusufGenc34\FilamentApiForge\Attributes\ApiVersion;
+
+#[ApiVersion('v2')]
+class PostResource extends Resource implements HasApi { ... }
+```
+
+A `v2`-only resource returns `404` on `/api/v1/...`. The first configured version keeps the unprefixed route names for backwards compatibility.
+
+---
+
+## GraphQL
+
+An optional GraphQL endpoint generated from the same `HasApi` definitions:
+
+```bash
+composer require webonyx/graphql-php
+```
+
+```env
+API_FORGE_GRAPHQL=true
+```
+
+```graphql
+POST /api/v1/graphql
+
+query  { posts(page: 1, perPage: 20, search: "laravel", status: "published") {
+           total currentPage data { id title status } } }
+query  { post(id: 1) { id title } }
+
+mutation { createPost(title: "Via GraphQL", status: "draft") { id } }
+mutation { updatePost(id: 1, status: "published") { status } }
+mutation { deletePost(id: 1) }
+```
+
+Queries require the **read** scope, mutations **write**/**delete** (including `scope_map` overrides). Mutations run the full validation + hooks + events pipeline, and tenant scoping applies. Without the library installed the endpoint responds `501` with install instructions.
+
+---
+
 ## Developer Center
 
 The Developer Center is embedded in your Filament panel under the **Developer Center** navigation group.
@@ -566,6 +803,7 @@ The Developer Center is embedded in your Filament panel under the **Developer Ce
 | **API Docs** | `/admin/developer/api-docs` | Interactive OpenAPI documentation with try-it-out panel and Publish Docs button |
 | **Access Control** | `/admin/developer/access-control` | Enable/disable resources and individual methods; set rate limits and IP whitelists per resource or method |
 | **Settings** | `/admin/developer/settings` | Configure route segment, view route preview, and reset request counters |
+| **Webhooks** | `/admin/developer/webhooks` | Register, pause and delete signed webhook endpoints |
 
 ---
 
@@ -647,6 +885,7 @@ return [
     'auth' => [
         'enabled'                 => true,
         'default_expiration_days' => 365,
+        'refresh_tokens'          => env('API_FORGE_REFRESH_TOKENS', false),
     ],
 
     'docs' => [
@@ -697,6 +936,44 @@ return [
         'enabled'            => true,
         'max_size'           => 100,
         'allowed_operations' => ['create', 'update', 'delete'],
+    ],
+
+    'export' => [
+        'enabled'  => true,
+        'max_rows' => 10000,
+        'formats'  => ['csv', 'json'],
+    ],
+
+    'audit' => [
+        'enabled'    => env('API_FORGE_AUDIT', true),
+        'prune_days' => 30,
+    ],
+
+    'notifications' => [
+        'channels'    => ['mail', 'database'],
+        'expiry_days' => 7,
+    ],
+
+    'cache' => [
+        'enabled' => env('API_FORGE_CACHE', false),
+        'ttl'     => 60,
+        'store'   => null,               // null = default cache store
+    ],
+
+    'webhooks' => [
+        'enabled' => true,
+        'timeout' => 10,
+    ],
+
+    'multi_tenant' => [
+        'enabled' => true,
+    ],
+
+    'versions' => null,                  // e.g. ['v1', 'v2'] for multi-version mode
+    'api_base' => env('API_FORGE_BASE', 'api'),
+
+    'graphql' => [
+        'enabled' => env('API_FORGE_GRAPHQL', false),
     ],
 ];
 ```

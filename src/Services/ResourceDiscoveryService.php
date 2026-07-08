@@ -55,6 +55,7 @@ class ResourceDiscoveryService
                     'api_config'     => $apiConfig,
                     'label'          => $resourceClass::getModelLabel(),
                     'plural_label'   => $resourceClass::getPluralModelLabel(),
+                    'versions'       => $this->resourceVersions($resourceClass),
                 ]);
             }
         }
@@ -62,19 +63,69 @@ class ResourceDiscoveryService
         return $this->discoveredResources;
     }
 
-    public function findResource(string $panelId, string $slug): ?array
+    public function findResource(string $panelId, string $slug, ?string $version = null): ?array
     {
+        // Version context comes from the SetApiForgeVersion middleware when
+        // multi-version mode is active; explicit argument wins.
+        $version ??= $this->currentVersion();
+
+        $matchesVersion = fn (array $r) => $this->resourceAvailableIn($r, $version);
+
         // Try exact panel match first
-        $resource = $this->discover()->first(function (array $resource) use ($panelId, $slug) {
-            return $resource['panel_id'] === $panelId && $resource['slug'] === $slug;
+        $resource = $this->discover()->first(function (array $resource) use ($panelId, $slug, $matchesVersion) {
+            return $resource['panel_id'] === $panelId && $resource['slug'] === $slug && $matchesVersion($resource);
         });
 
         // If no exact panel match, search by slug across all panels (supports custom route segments)
         if (! $resource) {
-            $resource = $this->discover()->first(fn (array $r) => $r['slug'] === $slug);
+            $resource = $this->discover()->first(fn (array $r) => $r['slug'] === $slug && $matchesVersion($r));
         }
 
         return $resource;
+    }
+
+    /**
+     * Resources available in the given (or current) API version.
+     */
+    public function discoverForVersion(?string $version = null): Collection
+    {
+        $version ??= $this->currentVersion();
+
+        return $this->discover()
+            ->filter(fn (array $r) => $this->resourceAvailableIn($r, $version))
+            ->values();
+    }
+
+    public function resourceAvailableIn(array $resource, ?string $version): bool
+    {
+        $versions = $resource['versions'] ?? null;
+
+        // No version context or unrestricted resource → always available
+        return $version === null || $versions === null || in_array($version, $versions);
+    }
+
+    protected function currentVersion(): ?string
+    {
+        try {
+            return request()->attributes->get('api_forge_version');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return string[]|null null = available in every version
+     */
+    protected function resourceVersions(string $resourceClass): ?array
+    {
+        try {
+            $ref   = new \ReflectionClass($resourceClass);
+            $attrs = $ref->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiVersion::class);
+
+            return $attrs ? $attrs[0]->newInstance()->versions : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function getResourcesForPanel(string $panelId): Collection

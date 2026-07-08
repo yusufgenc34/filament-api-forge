@@ -57,6 +57,11 @@ return [
     'auth' => [
         'enabled' => true,
         'default_expiration_days' => 365,
+
+        // Issue forge_refresh_ tokens alongside access tokens. Refresh tokens
+        // can be exchanged for a new access token at POST auth/token/refresh
+        // even after the access token has expired.
+        'refresh_tokens' => env('API_FORGE_REFRESH_TOKENS', false),
     ],
 
     /*
@@ -174,6 +179,119 @@ return [
         'enabled' => true,
         'max_size' => 100,
         'allowed_operations' => ['create', 'update', 'delete'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Export
+    |--------------------------------------------------------------------------
+    |
+    | GET {resource}/export?format=csv|json — requires 'export' in the
+    | resource's allowed_methods.
+    |
+    */
+    'export' => [
+        'enabled'  => true,
+        'max_rows' => 10000,
+        'formats'  => ['csv', 'json'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audit Log
+    |--------------------------------------------------------------------------
+    |
+    | Log every API request (token, action, status, duration, IP) to the
+    | api_forge_request_logs table. Prune with: php artisan api-forge:prune-logs
+    |
+    */
+    'audit' => [
+        'enabled'    => env('API_FORGE_AUDIT', true),
+        'prune_days' => 30,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Token expiry warnings sent by: php artisan api-forge:notify-expiring
+    |
+    */
+    'notifications' => [
+        'channels'    => ['mail', 'database'],
+        'expiry_days' => 7,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response Cache
+    |--------------------------------------------------------------------------
+    |
+    | Cache GET index/show responses. Any write to a resource (including
+    | batch, nested and custom actions) invalidates its cached responses.
+    |
+    */
+    'cache' => [
+        'enabled' => env('API_FORGE_CACHE', false),
+        'ttl'     => 60,   // seconds
+        'store'   => null, // null = default cache store
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhooks
+    |--------------------------------------------------------------------------
+    |
+    | HTTP callbacks fired on API write events. Manage endpoints in the
+    | api_forge_webhooks table; payloads are signed with X-ApiForge-Signature
+    | when the webhook has a secret.
+    |
+    */
+    'webhooks' => [
+        'enabled' => true,
+        'timeout' => 10, // seconds
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Multi-Tenancy
+    |--------------------------------------------------------------------------
+    |
+    | When a token carries a tenant_id and a resource declares
+    | apiConfig()['tenant_column'], every query is scoped to that tenant
+    | and created records are stamped with it.
+    |
+    */
+    'multi_tenant' => [
+        'enabled' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Versions
+    |--------------------------------------------------------------------------
+    |
+    | null  → single-version mode using 'api_prefix' (default).
+    | array → multi-version mode, e.g. ['v1', 'v2']: routes are registered
+    |         under {api_base}/{version} for each entry, and resources can
+    |         opt into specific versions with #[ApiVersion('v2')].
+    |
+    */
+    'versions' => null,
+    'api_base' => env('API_FORGE_BASE', 'api'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | GraphQL
+    |--------------------------------------------------------------------------
+    |
+    | Optional GraphQL endpoint (POST {api_prefix}/graphql) with a schema
+    | generated from your HasApi resources. Requires webonyx/graphql-php.
+    |
+    */
+    'graphql' => [
+        'enabled' => env('API_FORGE_GRAPHQL', false),
     ],
 
     /*

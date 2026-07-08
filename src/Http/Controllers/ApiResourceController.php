@@ -2,8 +2,14 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
+use YusufGenc34\FilamentApiForge\Concerns\BuildsResourceQuery;
 use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
 use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
+use YusufGenc34\FilamentApiForge\Concerns\ResolvesApiResource;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestored;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestoring;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use YusufGenc34\FilamentApiForge\Services\FileUploadService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
@@ -25,8 +31,10 @@ use Spatie\QueryBuilder\AllowedSort;
 
 class ApiResourceController extends Controller
 {
+    use BuildsResourceQuery;
     use ExecutesApiHooks;
     use ExtractsApiValidationRules;
+    use ResolvesApiResource;
 
     public function __construct(
         protected ResourceDiscoveryService $discoveryService,
@@ -46,54 +54,14 @@ class ApiResourceController extends Controller
             return $resource;
         }
 
-        $modelClass = $resource['model_class'];
         $perPage = min(
-            (int) $request->input('per_page', config('filament-api-forge.default_per_page', 15)),
-            (int) config('filament-api-forge.max_per_page', 100)
+            (int) $request->input('per_page', config('filament-api-forge.pagination.default_per_page', 15)),
+            (int) config('filament-api-forge.pagination.max_per_page', 100)
         );
 
-        $query = QueryBuilder::for($modelClass);
-
-        // Apply allowed filters
-        $allowedFilters = $this->discoveryService->getAllowedFilters($resource);
-        if (! empty($allowedFilters)) {
-            $query->allowedFilters(
-                collect($allowedFilters)->map(fn (string $filter) => AllowedFilter::partial($filter))->toArray()
-            );
-        }
-
-        // Apply allowed sorts
-        $allowedSorts = $this->discoveryService->getAllowedSorts($resource);
-        if (! empty($allowedSorts)) {
-            $query->allowedSorts($allowedSorts);
-        }
-
-        // Apply allowed fields (must come before allowedIncludes per Spatie QB contract)
-        $allowedFields = $this->discoveryService->getAllowedFields($resource);
-        if (! empty($allowedFields)) {
-            $query->allowedFields($allowedFields);
-        }
-
-        // Apply allowed includes (relations)
-        $allowedIncludes = $this->discoveryService->getAllowedIncludes($resource);
-        if (! empty($allowedIncludes)) {
-            $query->allowedIncludes($allowedIncludes);
-        }
-
-        // Searchable
-        $searchable = $resource['api_config']['searchable'] ?? [];
-        if (! empty($searchable) && $request->has('search')) {
-            // Escape LIKE metacharacters to prevent wildcard injection
-            $searchTerm = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $request->input('search', ''));
-            $query->where(function ($q) use ($searchable, $searchTerm) {
-                foreach ($searchable as $i => $column) {
-                    $method = $i === 0 ? 'where' : 'orWhere';
-                    $q->{$method}($column, 'LIKE', "%{$searchTerm}%");
-                }
-            });
-        }
-
-        $results = $query->paginate($perPage)->appends($request->query());
+        $results = $this->buildListQuery($resource, $request)
+            ->paginate($perPage)
+            ->appends($request->query());
 
         return ApiForgeJsonResource::collection($results)->additional([
             'meta' => [
@@ -116,19 +84,17 @@ class ApiResourceController extends Controller
             return $resource;
         }
 
-        $modelClass = $resource['model_class'];
-
-        $query = QueryBuilder::for($modelClass);
+        $query = QueryBuilder::for($this->baseQueryFor($resource, $request));
 
         // allowedFields must come before allowedIncludes (Spatie QB requirement)
         $allowedFields = $this->discoveryService->getAllowedFields($resource);
         if (! empty($allowedFields)) {
-            $query->allowedFields($allowedFields);
+            $query->allowedFields(...$allowedFields);
         }
 
         $allowedIncludes = $this->discoveryService->getAllowedIncludes($resource);
         if (! empty($allowedIncludes)) {
-            $query->allowedIncludes($allowedIncludes);
+            $query->allowedIncludes(...$allowedIncludes);
         }
 
         $record = $query->findOrFail($recordId);
@@ -174,6 +140,7 @@ class ApiResourceController extends Controller
 
         $record = new $modelClass();
         $record->fill($modelData);
+        $this->stampTenant($record, $resource);
         $record->save();
 
         // Handle file uploads if configured
@@ -213,7 +180,7 @@ class ApiResourceController extends Controller
         $resourceClass = $resource['resource_class'];
         $apiConfig = $resource['api_config'];
 
-        $record = $modelClass::findOrFail($recordId);
+        $record = $this->tenantScopedQuery($modelClass, $resource)->findOrFail($recordId);
 
         $rules = $this->extractValidationRules($resourceClass, true, $apiConfig);
         $rules = $this->mergeUploadRules($rules, $apiConfig);
@@ -270,7 +237,7 @@ class ApiResourceController extends Controller
 
         $modelClass = $resource['model_class'];
         $resourceClass = $resource['resource_class'];
-        $record = $modelClass::findOrFail($recordId);
+        $record = $this->tenantScopedQuery($modelClass, $resource)->findOrFail($recordId);
 
         $eventsEnabled = $this->eventsEnabled();
 
@@ -297,64 +264,94 @@ class ApiResourceController extends Controller
     }
 
     /**
-     * HTTP method → required scope mapping.
+     * POST /{panelId}/{resourceSlug}/{recordId}/restore
+     *
+     * Restore a soft-deleted resource.
      */
-    protected const SCOPE_MAP = [
-        'index'   => 'read',
-        'show'    => 'read',
-        'store'   => 'write',
-        'update'  => 'write',
-        'destroy' => 'delete',
-    ];
-
-    /**
-     * Resolve a resource from the discovery service and validate method + scope access.
-     */
-    protected function resolveResource(string $panelId, string $resourceSlug, string $method): array|JsonResponse
+    public function restore(Request $request, string $panelId, string $resourceSlug, string $recordId): ApiForgeJsonResource|JsonResponse
     {
-        $resource = $this->discoveryService->findResource($panelId, $resourceSlug);
+        $resource = $this->resolveResource($panelId, $resourceSlug, 'restore');
 
-        if (! $resource) {
-            return response()->json([
-                'message' => 'Resource not found.',
-                'error'   => 'not_found',
-            ], 404);
+        if ($resource instanceof JsonResponse) {
+            return $resource;
         }
 
-        if (! $this->discoveryService->isMethodAllowed($resource, $method)) {
+        $modelClass = $resource['model_class'];
+        $resourceClass = $resource['resource_class'];
+
+        if (! $this->modelUsesSoftDeletes($modelClass)) {
             return response()->json([
-                'message' => "Method '{$method}' is not allowed for this resource.",
+                'message' => 'This resource does not support soft deletes.',
                 'error'   => 'method_not_allowed',
             ], 405);
         }
 
-        // Scope enforcement: does the token have the required scope for this method?
-        $requiredScope = self::SCOPE_MAP[$method] ?? null;
+        $record = $this->tenantScopedQuery($modelClass, $resource)->onlyTrashed()->findOrFail($recordId);
 
-        if ($requiredScope) {
-            /** @var \YusufGenc34\FilamentApiForge\Models\ApiForgeToken|null $token */
-            $token = request()->attributes->get('api_forge_token');
+        $eventsEnabled = $this->eventsEnabled();
 
-            if (! $token || ! $token->hasScope($requiredScope)) {
-                return response()->json([
-                    'message' => "This token does not have the required '{$requiredScope}' scope for this operation.",
-                    'error'   => 'insufficient_scope',
-                    'required_scope' => $requiredScope,
-                ], 403);
-            }
+        $this->executeVoidHooks($resourceClass, 'beforeRestore', $record);
 
-            // Resource-level access check: verify if the token is restricted to specific resources
-            $allowedResources = $token->allowed_resources;
-
-            if (! empty($allowedResources) && ! in_array($resourceSlug, $allowedResources)) {
-                return response()->json([
-                    'message' => "This token is not authorized to access the '{$resourceSlug}' resource.",
-                    'error'   => 'resource_not_allowed',
-                ], 403);
-            }
+        if ($eventsEnabled) {
+            ApiResourceRestoring::dispatch($resourceClass, $record);
         }
 
-        return $resource;
+        $record->restore();
+
+        if ($eventsEnabled) {
+            ApiResourceRestored::dispatch($resourceClass, $record);
+        }
+
+        $this->executeVoidHooks($resourceClass, 'afterRestore', $record);
+
+        return new ApiForgeJsonResource($record->fresh());
+    }
+
+    /**
+     * DELETE /{panelId}/{resourceSlug}/{recordId}/force
+     *
+     * Permanently delete a (possibly soft-deleted) resource.
+     */
+    public function forceDestroy(Request $request, string $panelId, string $resourceSlug, string $recordId): JsonResponse
+    {
+        $resource = $this->resolveResource($panelId, $resourceSlug, 'forceDelete');
+
+        if ($resource instanceof JsonResponse) {
+            return $resource;
+        }
+
+        $modelClass = $resource['model_class'];
+        $resourceClass = $resource['resource_class'];
+
+        if (! $this->modelUsesSoftDeletes($modelClass)) {
+            return response()->json([
+                'message' => 'This resource does not support soft deletes.',
+                'error'   => 'method_not_allowed',
+            ], 405);
+        }
+
+        $record = $this->tenantScopedQuery($modelClass, $resource)->withTrashed()->findOrFail($recordId);
+
+        $eventsEnabled = $this->eventsEnabled();
+
+        $this->executeVoidHooks($resourceClass, 'beforeForceDelete', $record);
+
+        if ($eventsEnabled) {
+            ApiResourceForceDeleting::dispatch($resourceClass, $record);
+        }
+
+        $record->forceDelete();
+
+        if ($eventsEnabled) {
+            ApiResourceForceDeleted::dispatch($resourceClass, $record);
+        }
+
+        $this->executeVoidHooks($resourceClass, 'afterForceDelete', $record);
+
+        return response()->json([
+            'message' => 'Resource permanently deleted.',
+            'deleted' => true,
+        ]);
     }
 
     /**
