@@ -158,6 +158,25 @@
         @endforeach
     </div>
 
+@elseif($selectedGuideKey && isset($guides[$selectedGuideKey]))
+
+    @php $guide = $guides[$selectedGuideKey]; @endphp
+
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <span class="ep-title">{{ $guide['title'] }}</span>
+        <span style="font-size:.6rem;font-weight:700;font-family:ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;padding:.2rem .5rem;border-radius:.25rem;background:{{ $guide['badge'] === 'disabled' ? 'rgba(148,163,184,.18)' : 'rgba(99,102,241,.12)' }};color:{{ $guide['badge'] === 'disabled' ? '#64748b' : 'var(--dv-accent)' }};">
+            {{ $guide['badge'] }}
+        </span>
+    </div>
+    <p class="ep-summary">{{ $guide['desc'] }}</p>
+
+    <hr class="divider">
+
+    @foreach($guide['blocks'] as $block)
+        <span class="sec-label">{{ $block['label'] }}</span>
+        <pre class="codeblock" style="white-space:pre-wrap;word-break:break-word;">{{ $block['code'] }}</pre>
+    @endforeach
+
 @elseif($selectedSchemaName && isset($schemas[$selectedSchemaName]))
 
     <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.25rem;">

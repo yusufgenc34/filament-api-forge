@@ -127,7 +127,7 @@ it('registers action routes before nested wildcard routes', function () {
 
 it('OpenAPI spec documents action, batch and nested endpoints', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
-    $mock->shouldReceive('discover')->andReturn(collect([
+    $mock->shouldReceive('discoverForVersion')->andReturn(collect([
         [
             'resource_class' => CollectionActionResource::class,
             'model_class'    => TestModel::class,

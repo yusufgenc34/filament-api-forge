@@ -36,6 +36,10 @@ class ApiDocumentation extends Page
     public ?string $selectedEndpointId = null;
     public ?array  $selectedEndpoint   = null;
     public ?string $selectedSchemaName = null;
+    public array   $guides             = [];
+    public ?string $selectedGuideKey   = null;
+    public array   $availableVersions  = [];
+    public ?string $docsVersion        = null;
 
     public bool   $docsPublic   = false;
     public bool   $tryPanelOpen = false;
@@ -51,8 +55,12 @@ class ApiDocumentation extends Page
 
     public function mount(): void
     {
+        $versions = config('filament-api-forge.versions');
+        $this->availableVersions = is_array($versions) ? array_values($versions) : [];
+        $this->docsVersion       = $this->availableVersions[0] ?? null;
+
         $controller = app(ApiDocumentationController::class);
-        $data = $controller->openApiSpec(request())->getData(true);
+        $data = $controller->openApiSpec(request(), $this->docsVersion)->getData(true);
 
         $this->baseUrl            = $data['servers'][0]['url'] ?? url('/');
         $this->version            = $data['info']['version'] ?? 'v1';
@@ -80,10 +88,82 @@ class ApiDocumentation extends Page
         }
         $this->groupedEndpoints = $grouped;
 
+        $this->guides = $this->buildGuides();
+
         if (!empty($grouped)) {
             $firstGroup = array_key_first($grouped);
             $this->selectEndpoint($grouped[$firstGroup][0]['id']);
         }
+    }
+
+    public function selectGuide(string $key): void
+    {
+        if (! isset($this->guides[$key])) {
+            return;
+        }
+
+        $this->selectedGuideKey   = $key;
+        $this->selectedEndpointId = null;
+        $this->selectedEndpoint   = null;
+        $this->selectedSchemaName = null;
+        $this->tryPanelOpen       = false;
+    }
+
+    public function selectVersion(string $version): void
+    {
+        if (! in_array($version, $this->availableVersions) || $version === $this->docsVersion) {
+            return;
+        }
+
+        $this->docsVersion = $version;
+
+        $controller = app(ApiDocumentationController::class);
+        $data = $controller->openApiSpec(request(), $version)->getData(true);
+
+        $this->baseUrl            = $data['servers'][0]['url'] ?? url('/');
+        $this->version            = $data['info']['version'] ?? $version;
+        $this->schemas            = $data['components']['schemas'] ?? [];
+        $this->responseComponents = $data['components']['responses'] ?? [];
+
+        $grouped = [];
+        foreach ($data['paths'] ?? [] as $path => $methods) {
+            foreach ($methods as $method => $operation) {
+                $tag = $operation['tags'][0] ?? 'General';
+                $id  = Str::slug($method . '-' . str_replace(['/', '{', '}'], ['-', '', ''], $path));
+                $grouped[$tag][] = [
+                    'id'        => $id,
+                    'method'    => strtoupper($method),
+                    'path'      => $path,
+                    'summary'   => $operation['summary'] ?? '',
+                    'operation' => $operation,
+                ];
+            }
+        }
+        $this->groupedEndpoints = $grouped;
+
+        $this->guides = $this->buildGuides();
+
+        $this->selectedEndpointId = null;
+        $this->selectedEndpoint   = null;
+        $this->selectedSchemaName = null;
+        $this->selectedGuideKey   = null;
+
+        if (! empty($grouped)) {
+            $firstGroup = array_key_first($grouped);
+            $this->selectEndpoint($grouped[$firstGroup][0]['id']);
+        }
+    }
+
+    /**
+     * Feature guides shown in the sidebar: ready-to-copy examples for the
+     * capabilities that are not plain REST endpoints (GraphQL) or that
+     * benefit from a walkthrough (export, batch, soft deletes, actions,
+     * token lifecycle, webhooks). Examples use the first discovered
+     * resource so they are copy-paste runnable.
+     */
+    protected function buildGuides(): array
+    {
+        return \YusufGenc34\FilamentApiForge\Support\FeatureGuides::build($this->baseUrl);
     }
 
     public function togglePublicDocs(): void
@@ -133,7 +213,7 @@ class ApiDocumentation extends Page
     private function reinitialize(): void
     {
         $controller = app(ApiDocumentationController::class);
-        $data       = $controller->openApiSpec(request())->getData(true);
+        $data       = $controller->openApiSpec(request(), $this->docsVersion)->getData(true);
 
         $this->schemas            = $data['components']['schemas'] ?? [];
         $this->responseComponents = $data['components']['responses'] ?? [];
@@ -191,6 +271,7 @@ class ApiDocumentation extends Page
 
                 $this->selectedEndpointId = $id;
                 $this->selectedSchemaName = null;
+                $this->selectedGuideKey   = null;
                 $this->tryPanelOpen       = false;
 
                 $ep['operation']['responses'] = $this->resolveResponses(
@@ -271,6 +352,7 @@ class ApiDocumentation extends Page
         $this->selectedSchemaName = $name;
         $this->selectedEndpointId = null;
         $this->selectedEndpoint   = null;
+        $this->selectedGuideKey   = null;
         $this->tryPanelOpen       = false;
     }
 

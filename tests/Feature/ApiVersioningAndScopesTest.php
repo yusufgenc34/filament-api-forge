@@ -164,3 +164,22 @@ it('apiTransform reshapes serialized records', function () {
 
     ApiForgeJsonResource::withTransformer(null);
 });
+
+it('OpenAPI spec is version-aware in multi-version mode', function () {
+    config()->set('filament-api-forge.versions', ['v1', 'v2']);
+    config()->set('filament-api-forge.api_base', 'api');
+
+    $controller = app(\YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController::class);
+
+    $v1 = $controller->openApiSpec(Request::create('/docs/openapi.json'))->getData(true);
+    $v2 = $controller->openApiSpec(Request::create('/docs/openapi.json?version=v2'))->getData(true);
+
+    expect($v1['info']['version'])->toBe('v1')
+        ->and($v1['servers'][0]['url'])->toEndWith('api/v1')
+        ->and($v2['info']['version'])->toBe('v2')
+        ->and($v2['servers'][0]['url'])->toEndWith('api/v2');
+
+    // Unknown versions fall back to the first configured version
+    $bogus = $controller->openApiSpec(Request::create('/docs/openapi.json?version=v99'))->getData(true);
+    expect($bogus['info']['version'])->toBe('v1');
+});

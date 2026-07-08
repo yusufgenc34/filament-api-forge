@@ -492,44 +492,212 @@ $pathMap = [
 
 </div>
 
-{{-- Recent API requests (audit log) --}}
-@if (! empty($recentRequests))
-<div style="margin-top: 24px; background: var(--af-card-bg, rgba(255,255,255,0.04));
-            border: 1px solid var(--af-border, rgba(148,163,184,0.15)); border-radius: 12px; padding: 24px;">
-    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 14px;">
-        <div style="font-size:14px; font-weight:600;">Recent API Requests</div>
-        @if ($avgResponseMs !== null)
-            <div style="font-size:12px; color:#64748b;">avg response (24h): <strong>{{ $avgResponseMs }} ms</strong></div>
+{{-- ── Insights (audit log, tokens, webhooks, features) ─────────────────── --}}
+<style>
+.af-insights { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; margin-top: 24px; }
+.af-ins-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+}
+.dark .af-ins-card { background: #1f2937; border-color: #374151; }
+.af-ins-title { font-size: 0.875rem; font-weight: 600; color: #111827; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+.dark .af-ins-title { color: #f9fafb; }
+.af-ins-sub { font-size: 0.75rem; font-weight: 400; color: #9ca3af; }
+.af-span-6 { grid-column: span 6; } .af-span-4 { grid-column: span 4; }
+.af-span-8 { grid-column: span 8; } .af-span-12 { grid-column: span 12; }
+@media (max-width: 1100px) { .af-span-6, .af-span-4, .af-span-8 { grid-column: span 12; } }
+
+.af-bars { display: flex; align-items: flex-end; gap: 10px; height: 110px; padding-top: 6px; }
+.af-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.af-bar { width: 100%; max-width: 44px; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, #818cf8, #6366f1); min-height: 3px; }
+.af-bar--zero { background: rgba(148,163,184,0.25); }
+.af-bar-label { font-size: 0.65rem; color: #9ca3af; }
+.af-bar-count { font-size: 0.65rem; font-weight: 600; color: #6b7280; }
+.dark .af-bar-count { color: #d1d5db; }
+
+.af-ins-table { width: 100%; font-size: 12.5px; border-collapse: collapse; }
+.af-ins-table th { text-align: left; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; padding: 0.5rem; border-bottom: 1px solid #f3f4f6; }
+.dark .af-ins-table th { border-bottom-color: #374151; color: #6b7280; }
+.af-ins-table td { padding: 0.625rem 0.5rem; border-top: 1px solid #f9fafb; vertical-align: middle; }
+.dark .af-ins-table td { border-top-color: #374151; }
+
+.af-mini-list { display: flex; flex-direction: column; gap: 9px; font-size: 12.5px; }
+.af-mini-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.af-mini-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-mini-meta { font-size: 0.6875rem; color: #9ca3af; font-family: ui-monospace, monospace; }
+.af-mini-value { font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+.af-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.af-chip--on  { background: rgba(16,185,129,0.12); color: #10b981; }
+.af-chip--off { background: rgba(148,163,184,0.16); color: #64748b; }
+.af-chip--warn { background: rgba(245,158,11,0.14); color: #d97706; }
+.af-chip--err { background: rgba(244,63,94,0.12); color: #f43f5e; }
+.af-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+.af-kpis { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 4px; }
+.af-kpi-v { font-size: 20px; font-weight: 700; line-height: 1.1; }
+.af-kpi-l { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #64748b; }
+.af-empty { font-size: 0.8125rem; color: #9ca3af; padding: 14px 0; }
+</style>
+
+<div class="af-insights">
+
+    {{-- Traffic: last 7 days --}}
+    <div class="af-ins-card af-span-6">
+        <div class="af-ins-title">
+            Requests — Last 7 Days
+            <span class="af-ins-sub">
+                today: <strong>{{ $requestsToday }}</strong>
+                @if ($avgResponseMs !== null) · avg {{ $avgResponseMs }} ms @endif
+                @if ($errorRate !== null) · errors {{ $errorRate }}% @endif
+            </span>
+        </div>
+        @if (empty($dailyRequests) || collect($dailyRequests)->sum('count') === 0)
+            <div class="af-empty">No API traffic recorded yet — requests appear here as soon as clients start calling the API.</div>
+        @else
+            <div class="af-bars">
+                @foreach ($dailyRequests as $day)
+                    <div class="af-bar-col">
+                        <span class="af-bar-count">{{ $day['count'] ?: '' }}</span>
+                        <div class="af-bar {{ $day['count'] === 0 ? 'af-bar--zero' : '' }}" style="height: {{ max(3, $day['pct']) }}%"></div>
+                        <span class="af-bar-label">{{ $day['label'] }}</span>
+                    </div>
+                @endforeach
+            </div>
         @endif
     </div>
-    <table style="width:100%; font-size:12.5px; border-collapse:collapse;">
-        <thead>
-            <tr style="color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">
-                <th style="text-align:left; padding:6px 8px;">Method</th>
-                <th style="text-align:left; padding:6px 8px;">Path</th>
-                <th style="text-align:left; padding:6px 8px;">Action</th>
-                <th style="text-align:left; padding:6px 8px;">Status</th>
-                <th style="text-align:left; padding:6px 8px;">Duration</th>
-                <th style="text-align:left; padding:6px 8px;">IP</th>
-                <th style="text-align:left; padding:6px 8px;">When</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($recentRequests as $req)
-                <tr style="border-top:1px solid rgba(148,163,184,0.12);">
-                    <td style="padding:7px 8px; font-weight:600;">{{ $req['method'] }}</td>
-                    <td style="padding:7px 8px; font-family:ui-monospace,monospace; word-break:break-all;">{{ $req['path'] }}</td>
-                    <td style="padding:7px 8px; color:#64748b;">{{ $req['action'] }}</td>
-                    <td style="padding:7px 8px;">
-                        <span style="font-weight:600; color: {{ $req['status'] < 400 ? '#10b981' : '#f43f5e' }};">{{ $req['status'] }}</span>
-                    </td>
-                    <td style="padding:7px 8px;">{{ $req['duration_ms'] }} ms</td>
-                    <td style="padding:7px 8px; color:#64748b;">{{ $req['ip'] }}</td>
-                    <td style="padding:7px 8px; color:#64748b;">{{ $req['when'] }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+
+    {{-- Top endpoints --}}
+    <div class="af-ins-card af-span-3" style="grid-column: span 3;">
+        <div class="af-ins-title">Top Endpoints <span class="af-ins-sub">7 days</span></div>
+        @if (empty($topEndpoints))
+            <div class="af-empty">Nothing yet.</div>
+        @else
+            <div class="af-mini-list">
+                @foreach ($topEndpoints as $endpoint)
+                    <div class="af-mini-row">
+                        <div style="min-width:0">
+                            <span class="dd-badge dd-badge-{{ ['GET' => 'get', 'POST' => 'post', 'PUT' => 'put', 'PATCH' => 'put', 'DELETE' => 'delete'][$endpoint['method']] ?? 'get' }}">{{ $endpoint['method'] }}</span>
+                            <span class="af-mini-name">{{ $endpoint['resource'] }}</span>
+                            <div class="af-mini-meta">{{ $endpoint['action'] }}</div>
+                        </div>
+                        <span class="af-mini-value">{{ $endpoint['count'] }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
+    {{-- Top tokens --}}
+    <div class="af-ins-card af-span-3" style="grid-column: span 3;">
+        <div class="af-ins-title">Top Tokens <span class="af-ins-sub">all time</span></div>
+        @if (empty($topTokens))
+            <div class="af-empty">No token usage yet.</div>
+        @else
+            <div class="af-mini-list">
+                @foreach ($topTokens as $token)
+                    <div class="af-mini-row">
+                        <div style="min-width:0">
+                            <div class="af-mini-name">{{ $token['name'] }}</div>
+                            <div class="af-mini-meta">{{ $token['prefix'] }}…</div>
+                        </div>
+                        <span class="af-mini-value">{{ $token['count'] }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
+    {{-- Recent requests --}}
+    <div class="af-ins-card af-span-8">
+        <div class="af-ins-title">Recent API Requests</div>
+        @if (empty($recentRequests))
+            <div class="af-empty">No requests logged yet.</div>
+        @else
+            <table class="af-ins-table">
+                <thead>
+                    <tr><th>Method</th><th>Path</th><th>Action</th><th>Status</th><th>Time</th><th>When</th></tr>
+                </thead>
+                <tbody>
+                    @foreach ($recentRequests as $req)
+                        <tr>
+                            <td><span class="dd-badge dd-badge-{{ ['GET' => 'get', 'POST' => 'post', 'PUT' => 'put', 'PATCH' => 'put', 'DELETE' => 'delete'][$req['method']] ?? 'get' }}">{{ $req['method'] }}</span></td>
+                            <td style="font-family:ui-monospace,monospace; word-break:break-all;">{{ $req['path'] }}</td>
+                            <td style="color:#64748b;">{{ $req['action'] }}</td>
+                            <td><strong style="color: {{ $req['status'] < 400 ? '#10b981' : '#f43f5e' }};">{{ $req['status'] }}</strong></td>
+                            <td>{{ $req['duration_ms'] }} ms</td>
+                            <td style="color:#64748b;">{{ $req['when'] }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+    </div>
+
+    {{-- Right column: webhooks + expiring tokens + features --}}
+    <div class="af-span-4" style="display:flex; flex-direction:column; gap:20px;">
+
+        <div class="af-ins-card">
+            <div class="af-ins-title">Webhook Health</div>
+            @if (empty($webhookOverview))
+                <div class="af-empty">No webhooks registered — add one under Developer Center → Webhooks.</div>
+            @else
+                <div class="af-mini-list">
+                    @foreach ($webhookOverview as $hook)
+                        <div class="af-mini-row">
+                            <div style="min-width:0">
+                                <div class="af-mini-name">{{ $hook['name'] }}</div>
+                                <div class="af-mini-meta">last: {{ $hook['last'] }}</div>
+                            </div>
+                            <div style="white-space:nowrap">
+                                @if ($hook['failures'] > 0)
+                                    <span class="af-chip af-chip--err">{{ $hook['failures'] }} failed</span>
+                                @endif
+                                <span class="af-chip {{ $hook['active'] ? 'af-chip--on' : 'af-chip--off' }}">
+                                    <span class="af-dot"></span>{{ $hook['active'] ? 'active' : 'paused' }}
+                                </span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <div class="af-ins-card">
+            <div class="af-ins-title">Expiring Tokens <span class="af-ins-sub">next 14 days</span></div>
+            @if (empty($expiringTokens))
+                <div class="af-empty">Nothing expiring soon 🎉</div>
+            @else
+                <div class="af-mini-list">
+                    @foreach ($expiringTokens as $token)
+                        <div class="af-mini-row">
+                            <div style="min-width:0">
+                                <div class="af-mini-name">{{ $token['name'] }}</div>
+                                <div class="af-mini-meta">{{ $token['prefix'] }}…</div>
+                            </div>
+                            <span class="af-chip {{ $token['days'] <= 3 ? 'af-chip--err' : 'af-chip--warn' }}">
+                                {{ $token['days'] }}d left{{ $token['notified'] ? ' · notified' : '' }}
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <div class="af-ins-card">
+            <div class="af-ins-title">Feature Status</div>
+            <div style="display:flex; flex-wrap:wrap; gap:7px;">
+                @foreach ($featureFlags as $flag)
+                    <span class="af-chip {{ $flag['on'] ? 'af-chip--on' : 'af-chip--off' }}">
+                        <span class="af-dot"></span>{{ $flag['label'] }}
+                    </span>
+                @endforeach
+            </div>
+        </div>
+
+    </div>
+
 </div>
-@endif
 </x-filament-panels::page>

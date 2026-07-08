@@ -20,21 +20,56 @@ class ApiDocumentationController extends Controller
         protected ResourceDiscoveryService $discoveryService,
     ) {}
 
-    public function publicDocs(): Response
+    public function publicDocs(Request $request): Response
     {
         if (! ApiForgeGlobalSetting::get('docs_public', false)) {
             abort(403, 'API documentation is not publicly available.');
         }
 
-        $openApiUrl = route('api-forge.docs.openapi');
+        $configVersions = config('filament-api-forge.versions');
+        $multiVersion   = is_array($configVersions) && ! empty($configVersions);
 
-        return response()->view('filament-api-forge::public-docs', compact('openApiUrl'));
+        $currentVersion = null;
+        $versionLinks   = [];
+        $openApiUrl     = route('api-forge.docs.openapi');
+
+        if ($multiVersion) {
+            $currentVersion = $request->attributes->get('api_forge_version') ?? $configVersions[0];
+
+            if (! in_array($currentVersion, $configVersions)) {
+                $currentVersion = $configVersions[0];
+            }
+
+            $openApiUrl .= '?version=' . $currentVersion;
+
+            $base = rtrim(config('filament-api-forge.api_base', 'api'), '/');
+            foreach ($configVersions as $v) {
+                $versionLinks[$v] = url("{$base}/{$v}/docs");
+            }
+        }
+
+        return response()->view(
+            'filament-api-forge::public-docs',
+            compact('openApiUrl', 'currentVersion', 'versionLinks')
+        );
     }
 
-    public function openApiSpec(Request $request): JsonResponse
+    public function openApiSpec(Request $request, ?string $version = null): JsonResponse
     {
-        $resources = $this->discoveryService->discover();
-        $apiPrefix = config('filament-api-forge.api_prefix', 'api/v1');
+        // Version context: explicit arg → ?version= query → route middleware
+        $version ??= $request->query('version') ?? $request->attributes->get('api_forge_version');
+
+        $configVersions = config('filament-api-forge.versions');
+        $multiVersion   = is_array($configVersions) && ! empty($configVersions);
+
+        if ($multiVersion) {
+            $version = in_array($version, $configVersions) ? $version : $configVersions[0];
+            $apiPrefix = rtrim(config('filament-api-forge.api_base', 'api'), '/') . '/' . $version;
+        } else {
+            $apiPrefix = config('filament-api-forge.api_prefix', 'api/v1');
+        }
+
+        $resources = $this->discoveryService->discoverForVersion($version);
         $baseUrl   = url($apiPrefix);
 
         $paths = [];
@@ -517,7 +552,55 @@ class ApiDocumentationController extends Controller
             }
         }
 
-        // ── 2. MANUAL APP API ROUTES ──────────────────────────────────────
+        // ── 2. TOKEN LIFECYCLE ENDPOINTS ──────────────────────────────────
+        if (config('filament-api-forge.auth.enabled', true)) {
+            $tokenResponse = fn (array $extra = []) => [
+                'description' => 'The new token pair. Store it now — it is shown only once.',
+                'content'     => ['application/json' => ['schema' => [
+                    'type'       => 'object',
+                    'properties' => array_merge([
+                        'message'    => ['type' => 'string'],
+                        'token'      => ['type' => 'string', 'example' => 'forge_xxxxxxxxxxxxxxxxxxxx'],
+                        'expires_at' => ['type' => 'string', 'format' => 'date-time'],
+                    ], $extra),
+                ]]],
+            ];
+
+            $paths['/auth/token/refresh']['post'] = [
+                'tags'        => ['Authentication'],
+                'summary'     => 'Refresh an access token',
+                'operationId' => 'refreshToken',
+                'description' => 'Exchange a `forge_refresh_` token for a new access + refresh token pair. Works even after the access token has expired. Requires `auth.refresh_tokens` to be enabled.',
+                'requestBody' => [
+                    'required' => true,
+                    'content'  => ['application/json' => ['schema' => [
+                        'type'       => 'object',
+                        'required'   => ['refresh_token'],
+                        'properties' => [
+                            'refresh_token' => ['type' => 'string', 'example' => 'forge_refresh_xxxxxxxxxxxx'],
+                        ],
+                    ]]],
+                ],
+                'responses' => [
+                    '200' => $tokenResponse(['refresh_token' => ['type' => 'string', 'example' => 'forge_refresh_xxxxxxxxxxxx']]),
+                    '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                ],
+            ];
+
+            $paths['/auth/token/rotate']['post'] = [
+                'tags'        => ['Authentication'],
+                'summary'     => 'Rotate the current access token',
+                'operationId' => 'rotateToken',
+                'description' => 'Replace the authenticated access token with a fresh one. The old token stops working immediately.',
+                'responses'   => [
+                    '200' => $tokenResponse(),
+                    '401' => ['$ref' => '#/components/responses/Unauthenticated'],
+                ],
+                'security' => [['sanctum' => []]],
+            ];
+        }
+
+        // ── 3. MANUAL APP API ROUTES ──────────────────────────────────────
         foreach (Route::getRoutes() as $route) {
             $uri = $route->uri();
 
@@ -551,7 +634,7 @@ class ApiDocumentationController extends Controller
             'info'    => [
                 'title'       => config('filament-api-forge.docs.title', 'API Documentation'),
                 'description' => config('filament-api-forge.docs.description', ''),
-                'version'     => config('filament-api-forge.api_version', 'v1'),
+                'version'     => $version ?? config('filament-api-forge.api_version', 'v1'),
             ],
             'servers'    => [['url' => $baseUrl, 'description' => 'Current Server']],
             'paths'      => $paths,

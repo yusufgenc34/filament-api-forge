@@ -61,10 +61,7 @@ it('public docs endpoint is accessible when published', function () {
 
     $response = $this->get('/api/v1/docs');
 
-    // Should not be 403 when published
-    if ($response->status() !== 500) {
-        expect($response->status())->not->toBe(403);
-    }
+    $response->assertOk();
 });
 
 it('public docs returns 403 when not published', function () {

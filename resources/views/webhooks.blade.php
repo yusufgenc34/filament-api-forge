@@ -7,15 +7,15 @@
 @media (max-width: 1000px) { .wh-wrap { grid-template-columns: 1fr; } }
 
 .wh-card {
-    background: var(--af-card-bg, rgba(255,255,255,0.04));
-    border: 1px solid var(--af-border, rgba(148,163,184,0.15));
-    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
     padding: 24px;
 }
-.dark .wh-card { background: rgba(30,41,59,0.6); border-color: rgba(71,85,105,0.4); }
+.dark .wh-card { background: #1f2937; border-color: #374151; }
 
-.wh-title { font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
-.dark .wh-title { color: #f1f5f9; }
+.wh-title { font-size: 0.875rem; font-weight: 600; color: #111827; margin-bottom: 4px; }
+.dark .wh-title { color: #f9fafb; }
 .wh-desc { font-size: 12px; color: #64748b; margin-bottom: 20px; }
 
 .wh-label { display:block; font-size: 12px; font-weight: 500; color: #475569; margin: 12px 0 4px; }
@@ -23,7 +23,7 @@
 
 .wh-input, .wh-select {
     width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px;
-    border: 1px solid rgba(148,163,184,0.35); background: transparent; color: inherit;
+    border: 1px solid #e5e7eb; background: transparent; color: inherit;
 }
 .wh-checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12.5px; }
 .wh-checks label { display: flex; align-items: center; gap: 6px; }
@@ -36,8 +36,10 @@
 
 .wh-table { width: 100%; font-size: 13px; border-collapse: collapse; }
 .wh-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    color: #64748b; padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.25); }
-.wh-table td { padding: 10px; border-bottom: 1px solid rgba(148,163,184,0.12); vertical-align: top; }
+    color: #9ca3af; padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+.dark .wh-table th { border-bottom-color: #374151; }
+.wh-table td { padding: 10px; border-bottom: 1px solid #f9fafb; vertical-align: top; }
+.dark .wh-table td { border-bottom-color: #374151; }
 
 .wh-pill { display:inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
     background: rgba(99,102,241,0.12); color: #6366f1; margin: 1px 2px 1px 0; }

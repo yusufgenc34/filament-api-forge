@@ -72,6 +72,30 @@
             text-transform: uppercase;
         }
         .topbar-spacer { flex: 1; }
+        .ver-switch {
+            display: inline-flex;
+            gap: 2px;
+            background: var(--toggle-bg);
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .ver-pill {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: ui-monospace, monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 3px 10px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--toggle-color);
+            transition: background 0.15s, color 0.15s;
+        }
+        .ver-pill:hover { color: var(--text-title); }
+        .ver-pill-active {
+            background: var(--badge-bg);
+            color: var(--badge-color);
+        }
         .theme-toggle {
             display: flex;
             align-items: center;
@@ -223,7 +247,15 @@
     <div class="topbar">
       <div class="topbar-inner">
         <span class="topbar-title">{{ config('filament-api-forge.docs.title', 'API Documentation') }}</span>
-        <span class="topbar-badge">{{ config('filament-api-forge.api_version', 'v1') }}</span>
+        @if(!empty($versionLinks ?? []))
+            <span class="ver-switch">
+                @foreach($versionLinks as $v => $link)
+                    <a href="{{ $link }}" class="ver-pill {{ ($currentVersion ?? '') === $v ? 'ver-pill-active' : '' }}">{{ $v }}</a>
+                @endforeach
+            </span>
+        @else
+            <span class="topbar-badge">{{ config('filament-api-forge.api_version', 'v1') }}</span>
+        @endif
         <div class="topbar-spacer"></div>
         <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme">
             <svg id="iconLight" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="display:none">

@@ -31,6 +31,14 @@ class DeveloperDashboard extends Page
     public string $apiVersion      = '';
     public array  $recentRequests  = [];
     public ?int   $avgResponseMs   = null;
+    public int    $requestsToday   = 0;
+    public ?float $errorRate       = null;   // % of 4xx/5xx in the last 24h
+    public array  $dailyRequests   = [];     // last 7 days bar chart
+    public array  $topEndpoints    = [];     // by resource+action, last 7 days
+    public array  $topTokens       = [];     // by all-time request_count
+    public array  $expiringTokens  = [];     // within the next 14 days
+    public array  $webhookOverview = [];
+    public array  $featureFlags    = [];
 
     public function getMaxContentWidth(): Width | string | null
     {
@@ -65,12 +73,18 @@ class DeveloperDashboard extends Page
 
     protected function loadAuditStats(): void
     {
+        $this->loadTokenInsights();
+        $this->loadWebhookOverview();
+        $this->loadFeatureFlags();
+
         if (! config('filament-api-forge.audit.enabled', true)
             || ! \Illuminate\Support\Facades\Schema::hasTable('api_forge_request_logs')) {
             return;
         }
 
-        $this->recentRequests = \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::query()
+        $logModel = \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::class;
+
+        $this->recentRequests = $logModel::query()
             ->latest('created_at')
             ->limit(8)
             ->get()
@@ -85,11 +99,127 @@ class DeveloperDashboard extends Page
             ])
             ->all();
 
-        $avg = \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::query()
-            ->where('created_at', '>=', now()->subDay())
-            ->avg('duration_ms');
+        // 24h aggregates
+        $last24h = $logModel::query()->where('created_at', '>=', now()->subDay());
+
+        $total24h = (clone $last24h)->count();
+        $avg      = (clone $last24h)->avg('duration_ms');
 
         $this->avgResponseMs = $avg !== null ? (int) round($avg) : null;
+
+        if ($total24h > 0) {
+            $errors = (clone $last24h)->where('status', '>=', 400)->count();
+            $this->errorRate = round($errors * 100 / $total24h, 1);
+        }
+
+        $this->requestsToday = $logModel::query()
+            ->where('created_at', '>=', now()->startOfDay())
+            ->count();
+
+        // Last 7 days — grouped in PHP for cross-database compatibility
+        $byDay = $logModel::query()
+            ->where('created_at', '>=', now()->subDays(6)->startOfDay())
+            ->get(['created_at'])
+            ->groupBy(fn ($log) => $log->created_at->format('Y-m-d'))
+            ->map->count();
+
+        $max = max(1, $byDay->max() ?? 0);
+
+        $this->dailyRequests = collect(range(6, 0))
+            ->map(function (int $daysAgo) use ($byDay, $max) {
+                $date = now()->subDays($daysAgo);
+                $count = $byDay[$date->format('Y-m-d')] ?? 0;
+
+                return [
+                    'label' => $date->format('D'),
+                    'count' => $count,
+                    'pct'   => (int) round($count * 100 / $max),
+                ];
+            })
+            ->all();
+
+        // Top endpoints (7d) by resource + action
+        $this->topEndpoints = $logModel::query()
+            ->where('created_at', '>=', now()->subDays(7))
+            ->whereNotNull('resource_class')
+            ->get(['resource_class', 'action', 'method'])
+            ->groupBy(fn ($log) => class_basename($log->resource_class) . '·' . $log->action . '·' . $log->method)
+            ->map(fn ($group) => [
+                'resource' => class_basename($group->first()->resource_class),
+                'action'   => $group->first()->action,
+                'method'   => $group->first()->method,
+                'count'    => $group->count(),
+            ])
+            ->sortByDesc('count')
+            ->take(6)
+            ->values()
+            ->all();
+    }
+
+    protected function loadTokenInsights(): void
+    {
+        $this->topTokens = ApiForgeToken::query()
+            ->where('request_count', '>', 0)
+            ->orderByDesc('request_count')
+            ->limit(5)
+            ->get()
+            ->map(fn (ApiForgeToken $token) => [
+                'name'   => $token->name,
+                'prefix' => $token->token_prefix,
+                'count'  => self::abbreviateCount($token->request_count),
+                'active' => $token->is_active && ! $token->isExpired(),
+            ])
+            ->all();
+
+        $this->expiringTokens = ApiForgeToken::query()
+            ->active()
+            ->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [now(), now()->addDays(14)])
+            ->orderBy('expires_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (ApiForgeToken $token) => [
+                'name'    => $token->name,
+                'prefix'  => $token->token_prefix,
+                'days'    => (int) now()->diffInDays($token->expires_at),
+                'notified' => $token->expiry_notified_at !== null,
+            ])
+            ->all();
+    }
+
+    protected function loadWebhookOverview(): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('api_forge_webhooks')) {
+            return;
+        }
+
+        $this->webhookOverview = \YusufGenc34\FilamentApiForge\Models\ApiForgeWebhook::query()
+            ->orderByDesc('is_active')
+            ->orderByDesc('last_triggered_at')
+            ->limit(5)
+            ->get()
+            ->map(fn ($hook) => [
+                'name'     => $hook->name,
+                'active'   => $hook->is_active,
+                'failures' => $hook->failure_count,
+                'last'     => $hook->last_triggered_at?->diffForHumans(short: true) ?? 'never',
+            ])
+            ->all();
+    }
+
+    protected function loadFeatureFlags(): void
+    {
+        $versions = config('filament-api-forge.versions');
+
+        $this->featureFlags = [
+            ['label' => 'Audit Log',      'on' => (bool) config('filament-api-forge.audit.enabled', true)],
+            ['label' => 'Response Cache', 'on' => (bool) config('filament-api-forge.cache.enabled', false)],
+            ['label' => 'Webhooks',       'on' => (bool) config('filament-api-forge.webhooks.enabled', true)],
+            ['label' => 'GraphQL',        'on' => (bool) config('filament-api-forge.graphql.enabled', false)],
+            ['label' => 'Refresh Tokens', 'on' => (bool) config('filament-api-forge.auth.refresh_tokens', false)],
+            ['label' => 'Export',         'on' => (bool) config('filament-api-forge.export.enabled', true)],
+            ['label' => 'Multi-Version',  'on' => is_array($versions) && count($versions) > 1],
+        ];
     }
 
     protected function discoverAllForTree(): array

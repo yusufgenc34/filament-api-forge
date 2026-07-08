@@ -12,14 +12,14 @@
 @media (max-width: 900px) { .settings-wrap { grid-template-columns: 1fr; } }
 
 .settings-card {
-    background: var(--af-card-bg, rgba(255,255,255,0.04));
-    border: 1px solid var(--af-border, rgba(148,163,184,0.15));
-    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
     padding: 24px;
 }
 .dark .settings-card {
-    background: rgba(30,41,59,0.6);
-    border-color: rgba(71,85,105,0.4);
+    background: #1f2937;
+    border-color: #374151;
 }
 
 .settings-card-title {

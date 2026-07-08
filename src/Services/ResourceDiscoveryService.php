@@ -21,7 +21,14 @@ class ResourceDiscoveryService
 
         $settings = ApiForgeResourceSetting::all()->keyBy('resource_class');
 
-        foreach (Filament::getPanels() as $panel) {
+        try {
+            $panels = Filament::getPanels();
+        } catch (\Throwable) {
+            // Filament not booted (headless/console/test contexts) — no panels to scan
+            $panels = [];
+        }
+
+        foreach ($panels as $panel) {
             $panelId   = $panel->getId();
             $resources = $panel->getResources();
 

@@ -114,8 +114,24 @@ class AccessControl extends Page
                     'method_settings'  => $methodSettings,
                     'model_fields'     => $this->resolveModelFields($resourceClass),
                     'api_config'       => $apiConfig,
+                    'versions'         => $this->resolveResourceVersions($resourceClass),
                 ];
             }
+        }
+    }
+
+    /**
+     * @return string[]|null null = available in every configured version
+     */
+    private function resolveResourceVersions(string $resourceClass): ?array
+    {
+        try {
+            $ref   = new \ReflectionClass($resourceClass);
+            $attrs = $ref->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiVersion::class);
+
+            return $attrs ? $attrs[0]->newInstance()->versions : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 
