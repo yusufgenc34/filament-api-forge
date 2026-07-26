@@ -29,10 +29,10 @@ use Attribute;
 final class ApiOperations
 {
     public function __construct(
-        public readonly string|array|null $index   = null,
-        public readonly string|array|null $show    = null,
-        public readonly string|array|null $store   = null,
-        public readonly string|array|null $update  = null,
+        public readonly string|array|null $index = null,
+        public readonly string|array|null $show = null,
+        public readonly string|array|null $store = null,
+        public readonly string|array|null $update = null,
         public readonly string|array|null $destroy = null,
     ) {}
 
@@ -42,16 +42,21 @@ final class ApiOperations
     public function getSummary(string $operation): ?string
     {
         $value = match ($operation) {
-            'index'   => $this->index,
-            'show'    => $this->show,
-            'store'   => $this->store,
-            'update'  => $this->update,
+            'index' => $this->index,
+            'show' => $this->show,
+            'store' => $this->store,
+            'update' => $this->update,
             'destroy' => $this->destroy,
-            default   => null,
+            default => null,
         };
 
-        if (is_string($value)) return $value;
-        if (is_array($value))  return $value['summary'] ?? null;
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_array($value)) {
+            return $value['summary'] ?? null;
+        }
+
         return null;
     }
 
@@ -61,15 +66,18 @@ final class ApiOperations
     public function getDescription(string $operation): ?string
     {
         $value = match ($operation) {
-            'index'   => $this->index,
-            'show'    => $this->show,
-            'store'   => $this->store,
-            'update'  => $this->update,
+            'index' => $this->index,
+            'show' => $this->show,
+            'store' => $this->store,
+            'update' => $this->update,
             'destroy' => $this->destroy,
-            default   => null,
+            default => null,
         };
 
-        if (is_array($value)) return $value['description'] ?? null;
+        if (is_array($value)) {
+            return $value['description'] ?? null;
+        }
+
         return null;
     }
 }

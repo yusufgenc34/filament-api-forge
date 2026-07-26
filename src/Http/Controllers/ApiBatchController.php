@@ -2,20 +2,24 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
 use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestored;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestoring;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 class ApiBatchController extends Controller
 {
@@ -34,22 +38,26 @@ class ApiBatchController extends Controller
             return response()->json(['message' => 'Resource not found.', 'error' => 'not_found'], 404);
         }
 
-        $modelClass    = $resource['model_class'];
+        $modelClass = $resource['model_class'];
         $resourceClass = $resource['resource_class'];
-        $apiConfig     = $resource['api_config'];
-        $batchConfig   = $apiConfig['batch'] ?? [];
-        $maxSize       = $batchConfig['max_size'] ?? config('filament-api-forge.batch.max_size', 100);
+        $apiConfig = $resource['api_config'];
+        $batchConfig = $apiConfig['batch'] ?? [];
+        $maxSize = $batchConfig['max_size'] ?? config('filament-api-forge.batch.max_size', 100);
 
         $allowedOps = $batchConfig['allowed_operations']
             ?? config('filament-api-forge.batch.allowed_operations', ['create', 'update', 'delete']);
 
         $request->validate([
-            'create' => 'sometimes|array|max:' . $maxSize,
+            'create' => 'sometimes|array|max:'.$maxSize,
             'create.*' => 'array',
-            'update' => 'sometimes|array|max:' . $maxSize,
+            'update' => 'sometimes|array|max:'.$maxSize,
             'update.*.id' => 'required|int',
-            'delete' => 'sometimes|array|max:' . $maxSize,
+            'delete' => 'sometimes|array|max:'.$maxSize,
             'delete.*' => 'int',
+            'restore' => 'sometimes|array|max:'.$maxSize,
+            'restore.*' => 'int',
+            'forceDelete' => 'sometimes|array|max:'.$maxSize,
+            'forceDelete.*' => 'int',
         ]);
 
         // Read rows from the raw input: validated() strips row attributes
@@ -59,20 +67,22 @@ class ApiBatchController extends Controller
             'create' => $request->input('create', []),
             'update' => $request->input('update', []),
             'delete' => $request->input('delete', []),
+            'restore' => $request->input('restore', []),
+            'forceDelete' => $request->input('forceDelete', []),
         ];
 
-        $storeRules  = $this->extractValidationRules($resourceClass, false, $apiConfig, $modelClass);
+        $storeRules = $this->extractValidationRules($resourceClass, false, $apiConfig, $modelClass);
         $updateRules = $this->extractValidationRules($resourceClass, true, $apiConfig, $modelClass);
 
         $eventsEnabled = $this->eventsEnabled();
 
-        $created = $updated = $deleted = [];
-        $failed  = [];
+        $created = $updated = $deleted = $restored = $forceDeleted = [];
+        $failed = [];
 
         DB::transaction(function () use (
             $validated, $allowedOps, $modelClass, $resourceClass,
             $storeRules, $updateRules, $eventsEnabled,
-            &$created, &$updated, &$deleted, &$failed
+            &$created, &$updated, &$deleted, &$restored, &$forceDeleted, &$failed
         ) {
             // Create
             if (in_array('create', $allowedOps) && ! empty($validated['create'])) {
@@ -82,6 +92,7 @@ class ApiBatchController extends Controller
 
                         if ($validator->fails()) {
                             $failed[] = ['operation' => 'create', 'index' => $i, 'reason' => 'Validation failed.', 'errors' => $validator->errors()->toArray()];
+
                             continue;
                         }
 
@@ -92,7 +103,7 @@ class ApiBatchController extends Controller
                             ApiResourceCreating::dispatch($resourceClass, $data);
                         }
 
-                        $record = new $modelClass();
+                        $record = new $modelClass;
                         $record->fill($data);
                         $record->save();
 
@@ -120,6 +131,7 @@ class ApiBatchController extends Controller
 
                         if (! $record) {
                             $failed[] = ['operation' => 'update', 'index' => $i, 'reason' => 'Record not found.'];
+
                             continue;
                         }
 
@@ -127,6 +139,7 @@ class ApiBatchController extends Controller
 
                         if ($validator->fails()) {
                             $failed[] = ['operation' => 'update', 'index' => $i, 'reason' => 'Validation failed.', 'errors' => $validator->errors()->toArray()];
+
                             continue;
                         }
 
@@ -161,6 +174,7 @@ class ApiBatchController extends Controller
 
                         if (! $record) {
                             $failed[] = ['operation' => 'delete', 'index' => $i, 'reason' => 'Record not found.'];
+
                             continue;
                         }
 
@@ -184,6 +198,72 @@ class ApiBatchController extends Controller
                     }
                 }
             }
+
+            // Restore
+            if (in_array('restore', $allowedOps) && ! empty($validated['restore'])) {
+                foreach ($validated['restore'] as $i => $id) {
+                    try {
+                        $record = $modelClass::onlyTrashed()->find($id);
+
+                        if (! $record) {
+                            $failed[] = ['operation' => 'restore', 'index' => $i, 'reason' => 'Record not found in trash.'];
+
+                            continue;
+                        }
+
+                        $this->executeVoidHooks($resourceClass, 'beforeRestore', $record);
+
+                        if ($eventsEnabled) {
+                            ApiResourceRestoring::dispatch($resourceClass, $record);
+                        }
+
+                        $record->restore();
+
+                        if ($eventsEnabled) {
+                            ApiResourceRestored::dispatch($resourceClass, $record);
+                        }
+
+                        $this->executeVoidHooks($resourceClass, 'afterRestore', $record);
+
+                        $restored[] = (int) $id;
+                    } catch (\Throwable $e) {
+                        $failed[] = ['operation' => 'restore', 'index' => $i, 'reason' => $e->getMessage()];
+                    }
+                }
+            }
+
+            // Force Delete
+            if (in_array('forceDelete', $allowedOps) && ! empty($validated['forceDelete'])) {
+                foreach ($validated['forceDelete'] as $i => $id) {
+                    try {
+                        $record = $modelClass::withTrashed()->find($id);
+
+                        if (! $record) {
+                            $failed[] = ['operation' => 'forceDelete', 'index' => $i, 'reason' => 'Record not found.'];
+
+                            continue;
+                        }
+
+                        $this->executeVoidHooks($resourceClass, 'beforeForceDelete', $record);
+
+                        if ($eventsEnabled) {
+                            ApiResourceForceDeleting::dispatch($resourceClass, $record);
+                        }
+
+                        $record->forceDelete();
+
+                        if ($eventsEnabled) {
+                            ApiResourceForceDeleted::dispatch($resourceClass, $record);
+                        }
+
+                        $this->executeVoidHooks($resourceClass, 'afterForceDelete', $record);
+
+                        $forceDeleted[] = (int) $id;
+                    } catch (\Throwable $e) {
+                        $failed[] = ['operation' => 'forceDelete', 'index' => $i, 'reason' => $e->getMessage()];
+                    }
+                }
+            }
         });
 
         return response()->json([
@@ -191,7 +271,9 @@ class ApiBatchController extends Controller
             'created' => $created,
             'updated' => $updated,
             'deleted' => $deleted,
-            'failed'  => $failed,
+            'restored' => $restored,
+            'forceDeleted' => $forceDeleted,
+            'failed' => $failed,
         ]);
     }
 }

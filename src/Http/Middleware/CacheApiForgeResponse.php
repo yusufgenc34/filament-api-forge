@@ -3,9 +3,9 @@
 namespace YusufGenc34\FilamentApiForge\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\Request;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Support\ResponseCacheManager;
-use Illuminate\Http\Request;
 
 class CacheApiForgeResponse
 {
@@ -36,7 +36,7 @@ class CacheApiForgeResponse
         }
 
         $panelId = $request->route('panelId');
-        $slug    = $request->route('resourceSlug');
+        $slug = $request->route('resourceSlug');
 
         if (! $panelId || ! $slug) {
             return $next($request);
@@ -49,7 +49,7 @@ class CacheApiForgeResponse
         }
 
         $token = $request->attributes->get('api_forge_token');
-        $key   = ResponseCacheManager::key($resource['resource_class'], $request->fullUrl(), $token?->id);
+        $key = ResponseCacheManager::key($resource['resource_class'], $request->fullUrl(), $token?->id);
 
         $cached = ResponseCacheManager::get($key);
 
@@ -64,7 +64,7 @@ class CacheApiForgeResponse
         if ($response->getStatusCode() === 200) {
             ResponseCacheManager::put($key, [
                 'content' => $response->getContent(),
-                'status'  => $response->getStatusCode(),
+                'status' => $response->getStatusCode(),
             ]);
 
             $response->headers->set('X-ApiForge-Cache', 'miss');

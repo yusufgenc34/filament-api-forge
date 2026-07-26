@@ -1,17 +1,19 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
 
 class TenantModel extends Model
 {
     protected $table = 'tenant_models';
+
     protected $fillable = ['title', 'tenant_id'];
 }
 
@@ -20,12 +22,12 @@ function tenantController(): ApiResourceController
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\TenantResource',
-        'model_class'    => TenantModel::class,
-        'slug'           => 'tenant-models',
-        'plural_label'   => 'Tenant Models',
-        'api_config'     => [
-            'allowed_methods'  => ['index', 'show', 'store', 'update', 'destroy'],
-            'tenant_column'    => 'tenant_id',
+        'model_class' => TenantModel::class,
+        'slug' => 'tenant-models',
+        'plural_label' => 'Tenant Models',
+        'api_config' => [
+            'allowed_methods' => ['index', 'show', 'store', 'update', 'destroy'],
+            'tenant_column' => 'tenant_id',
             'validation_rules' => ['title' => ['required', 'string']],
         ],
     ]);
@@ -90,11 +92,11 @@ it('index returns everything when the token has no tenant', function () {
 it('show cannot access another tenant record', function () {
     $other = TenantModel::where('tenant_id', 'globex')->first();
 
-    $request = Request::create('/api/v1/admin/tenant-models/' . $other->id, 'GET');
+    $request = Request::create('/api/v1/admin/tenant-models/'.$other->id, 'GET');
     actAsTenant('acme', $request);
 
     expect(fn () => tenantController()->show($request, 'admin', 'tenant-models', (string) $other->id))
-        ->toThrow(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        ->toThrow(ModelNotFoundException::class);
 });
 
 it('store stamps the token tenant onto created records', function () {
@@ -109,11 +111,11 @@ it('store stamps the token tenant onto created records', function () {
 it('update cannot modify another tenant record', function () {
     $other = TenantModel::where('tenant_id', 'globex')->first();
 
-    $request = Request::create('/api/v1/admin/tenant-models/' . $other->id, 'PUT', ['title' => 'Hijacked']);
+    $request = Request::create('/api/v1/admin/tenant-models/'.$other->id, 'PUT', ['title' => 'Hijacked']);
     actAsTenant('acme', $request);
 
     expect(fn () => tenantController()->update($request, 'admin', 'tenant-models', (string) $other->id))
-        ->toThrow(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        ->toThrow(ModelNotFoundException::class);
 });
 
 it('tenant scoping is inert when multi_tenant is disabled', function () {

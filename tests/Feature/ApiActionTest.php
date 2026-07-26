@@ -1,15 +1,18 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiActionController;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
-use YusufGenc34\FilamentApiForge\Events\ApiActionExecuting;
-use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
+use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
+use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
+use YusufGenc34\FilamentApiForge\Events\ApiActionExecuting;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiActionController;
+use YusufGenc34\FilamentApiForge\Http\Middleware\EnforceApiForgeRules;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 // ── Stub resource with ApiAction methods ────────────────────────────────────
 
@@ -28,9 +31,10 @@ class ActionTestResource
     }
 }
 
-class ActionTestModel extends \Illuminate\Database\Eloquent\Model
+class ActionTestModel extends Model
 {
     protected $table = 'action_test_models';
+
     protected $fillable = ['title', 'status'];
 }
 
@@ -43,8 +47,8 @@ beforeEach(function () {
     });
 
     $this->user = User::create([
-        'name'     => 'Action User',
-        'email'    => 'action@example.com',
+        'name' => 'Action User',
+        'email' => 'action@example.com',
         'password' => bcrypt('password'),
     ]);
 
@@ -107,9 +111,9 @@ it('ApiActionController returns 404 for unknown action', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => ActionTestResource::class,
-        'model_class'    => ActionTestModel::class,
-        'slug'           => 'action-test',
-        'api_config'     => [],
+        'model_class' => ActionTestModel::class,
+        'slug' => 'action-test',
+        'api_config' => [],
     ]);
 
     $controller = new ApiActionController($mock);
@@ -125,9 +129,9 @@ it('ApiActionController executes publish action successfully', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => ActionTestResource::class,
-        'model_class'    => ActionTestModel::class,
-        'slug'           => 'action-test',
-        'api_config'     => [],
+        'model_class' => ActionTestModel::class,
+        'slug' => 'action-test',
+        'api_config' => [],
     ]);
 
     $controller = new ApiActionController($mock);
@@ -148,9 +152,9 @@ it('ApiActionController dispatches events during action execution', function () 
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => ActionTestResource::class,
-        'model_class'    => ActionTestModel::class,
-        'slug'           => 'action-test',
-        'api_config'     => [],
+        'model_class' => ActionTestModel::class,
+        'slug' => 'action-test',
+        'api_config' => [],
     ]);
 
     $controller = new ApiActionController($mock);
@@ -166,9 +170,9 @@ it('ApiActionController returns 405 for mismatched HTTP method', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => ActionTestResource::class,
-        'model_class'    => ActionTestModel::class,
-        'slug'           => 'action-test',
-        'api_config'     => [],
+        'model_class' => ActionTestModel::class,
+        'slug' => 'action-test',
+        'api_config' => [],
     ]);
 
     $controller = new ApiActionController($mock);
@@ -182,22 +186,22 @@ it('ApiActionController returns 405 for mismatched HTTP method', function () {
 });
 
 it('ApiActionController returns 403 when token lacks required scope', function () {
-    $plain = 'forge_' . str_repeat('a', 40);
+    $plain = 'forge_'.str_repeat('a', 40);
     $token = ApiForgeToken::create([
-        'user_id'      => $this->user->id,
-        'name'         => 'Read Only',
-        'token_hash'   => hash('sha256', $plain),
+        'user_id' => $this->user->id,
+        'name' => 'Read Only',
+        'token_hash' => hash('sha256', $plain),
         'token_prefix' => substr($plain, 0, 16),
-        'scopes'       => ['read'],
-        'is_active'    => true,
+        'scopes' => ['read'],
+        'is_active' => true,
     ]);
 
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => ActionTestResource::class,
-        'model_class'    => ActionTestModel::class,
-        'slug'           => 'action-test',
-        'api_config'     => [],
+        'model_class' => ActionTestModel::class,
+        'slug' => 'action-test',
+        'api_config' => [],
     ]);
 
     $controller = new ApiActionController($mock);
@@ -214,7 +218,7 @@ it('EnforceApiForgeRules resolveAction detects custom action names', function ()
     $request = Request::create('/api/v1/admin/posts/1/actions/custom_action', 'POST');
 
     // Set up a proper route that has the actionName parameter
-    $route = new \Illuminate\Routing\Route('POST', '{panelId}/{resourceSlug}/{recordId}/actions/{actionName}', []);
+    $route = new Route('POST', '{panelId}/{resourceSlug}/{recordId}/actions/{actionName}', []);
     $route->bind($request);
     $route->setParameter('panelId', 'admin');
     $route->setParameter('resourceSlug', 'posts');
@@ -223,7 +227,7 @@ it('EnforceApiForgeRules resolveAction detects custom action names', function ()
 
     $request->setRouteResolver(fn () => $route);
 
-    $middleware = new \YusufGenc34\FilamentApiForge\Http\Middleware\EnforceApiForgeRules(
+    $middleware = new EnforceApiForgeRules(
         app(ResourceDiscoveryService::class)
     );
 

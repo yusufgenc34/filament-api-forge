@@ -1,20 +1,20 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiExportController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\TestModel;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 function exportController(array $apiConfig = []): ApiExportController
 {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\ExportResource',
-        'model_class'    => TestModel::class,
-        'slug'           => 'test-models',
-        'plural_label'   => 'Test Models',
-        'api_config'     => array_merge(['allowed_methods' => ['index', 'export']], $apiConfig),
+        'model_class' => TestModel::class,
+        'slug' => 'test-models',
+        'plural_label' => 'Test Models',
+        'api_config' => array_merge(['allowed_methods' => ['index', 'export']], $apiConfig),
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturnUsing(
         fn (array $resource, string $method) => in_array($method, $resource['api_config']['allowed_methods'])
@@ -112,9 +112,9 @@ it('returns 405 when export is not in allowed_methods', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\ExportResource',
-        'model_class'    => TestModel::class,
-        'slug'           => 'test-models',
-        'api_config'     => ['allowed_methods' => ['index']],
+        'model_class' => TestModel::class,
+        'slug' => 'test-models',
+        'api_config' => ['allowed_methods' => ['index']],
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturnUsing(
         fn (array $resource, string $method) => in_array($method, $resource['api_config']['allowed_methods'])

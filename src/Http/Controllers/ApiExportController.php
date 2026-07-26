@@ -2,13 +2,13 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
-use YusufGenc34\FilamentApiForge\Concerns\BuildsResourceQuery;
-use YusufGenc34\FilamentApiForge\Concerns\ResolvesApiResource;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use YusufGenc34\FilamentApiForge\Concerns\BuildsResourceQuery;
+use YusufGenc34\FilamentApiForge\Concerns\ResolvesApiResource;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class ApiExportController extends Controller
 {
@@ -30,7 +30,7 @@ class ApiExportController extends Controller
         if (! config('filament-api-forge.export.enabled', true)) {
             return response()->json([
                 'message' => 'Export is disabled.',
-                'error'   => 'export_disabled',
+                'error' => 'export_disabled',
             ], 403);
         }
 
@@ -40,13 +40,13 @@ class ApiExportController extends Controller
             return $resource;
         }
 
-        $format  = strtolower($request->query('format', 'csv'));
+        $format = strtolower($request->query('format', 'csv'));
         $allowed = config('filament-api-forge.export.formats', ['csv', 'json']);
 
         if (! in_array($format, $allowed)) {
             return response()->json([
                 'message' => "Format '{$format}' is not supported.",
-                'error'   => 'unsupported_format',
+                'error' => 'unsupported_format',
                 'supported_formats' => array_values($allowed),
             ], 422);
         }
@@ -56,7 +56,7 @@ class ApiExportController extends Controller
 
         $query = $this->buildListQuery($resource, $request)->limit($maxRows);
 
-        $filename = $resource['slug'] . '-export-' . now()->format('Ymd_His') . '.' . $format;
+        $filename = $resource['slug'].'-export-'.now()->format('Ymd_His').'.'.$format;
 
         if ($format === 'json') {
             $rows = $query->get()->map(
@@ -66,7 +66,7 @@ class ApiExportController extends Controller
             return response()->json([
                 'data' => $rows,
                 'meta' => [
-                    'total'    => $rows->count(),
+                    'total' => $rows->count(),
                     'max_rows' => $maxRows,
                     'resource' => $resource['plural_label'],
                 ],

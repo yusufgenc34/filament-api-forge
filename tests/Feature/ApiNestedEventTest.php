@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
@@ -8,16 +12,13 @@ use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiNestedResourceController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Schema;
 
 // ── Test models ────────────────────────────────────────────────────────────
 
 class NestedEventParent extends Model
 {
     protected $table = 'nested_event_parents';
+
     protected $fillable = ['title'];
 
     public function items()
@@ -29,6 +30,7 @@ class NestedEventParent extends Model
 class NestedEventItem extends Model
 {
     protected $table = 'nested_event_items';
+
     protected $fillable = ['parent_id', 'name', 'position'];
 }
 
@@ -37,9 +39,9 @@ function makeNestedController(array $relationConfig): ApiNestedResourceControlle
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\NestedEventParentResource',
-        'model_class'    => NestedEventParent::class,
-        'slug'           => 'parents',
-        'api_config'     => ['relations' => ['items' => $relationConfig]],
+        'model_class' => NestedEventParent::class,
+        'slug' => 'parents',
+        'api_config' => ['relations' => ['items' => $relationConfig]],
     ]);
 
     return new ApiNestedResourceController($mock);
@@ -67,8 +69,8 @@ it('nested store dispatches creating and created events', function () {
     Event::fake();
 
     $controller = makeNestedController([
-        'relation_name'    => 'items',
-        'allowed_methods'  => ['store'],
+        'relation_name' => 'items',
+        'allowed_methods' => ['store'],
         'validation_rules' => ['name' => ['required', 'string']],
     ]);
 
@@ -91,8 +93,8 @@ it('nested update dispatches updating and updated events', function () {
     $item = $this->parent->items()->create(['name' => 'Original']);
 
     $controller = makeNestedController([
-        'relation_name'    => 'items',
-        'allowed_methods'  => ['update'],
+        'relation_name' => 'items',
+        'allowed_methods' => ['update'],
         'validation_rules' => ['name' => ['required', 'string']],
     ]);
 
@@ -112,7 +114,7 @@ it('nested destroy dispatches deleting and deleted events', function () {
     $item = $this->parent->items()->create(['name' => 'Doomed']);
 
     $controller = makeNestedController([
-        'relation_name'   => 'items',
+        'relation_name' => 'items',
         'allowed_methods' => ['destroy'],
     ]);
 
@@ -131,8 +133,8 @@ it('nested store respects dispatch_events=false', function () {
     config()->set('filament-api-forge.events.dispatch_events', false);
 
     $controller = makeNestedController([
-        'relation_name'    => 'items',
-        'allowed_methods'  => ['store'],
+        'relation_name' => 'items',
+        'allowed_methods' => ['store'],
         'validation_rules' => ['name' => ['required', 'string']],
     ]);
 
@@ -151,9 +153,9 @@ it('nested index supports allowed_sorts from relation config', function () {
     $this->parent->items()->create(['name' => 'A item', 'position' => 1]);
 
     $controller = makeNestedController([
-        'relation_name'   => 'items',
+        'relation_name' => 'items',
         'allowed_methods' => ['index'],
-        'allowed_sorts'   => ['position'],
+        'allowed_sorts' => ['position'],
     ]);
 
     $request = Request::create('/api/v1/admin/parents/1/items', 'GET', ['sort' => '-position']);

@@ -2,8 +2,8 @@
 
 namespace YusufGenc34\FilamentApiForge\Commands;
 
-use YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog;
 use Illuminate\Console\Command;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog;
 
 class PruneRequestLogsCommand extends Command
 {

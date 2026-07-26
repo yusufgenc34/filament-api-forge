@@ -2,17 +2,17 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
-use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
-use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
+use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
+use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class ApiDocumentationController extends Controller
 {
@@ -27,11 +27,11 @@ class ApiDocumentationController extends Controller
         }
 
         $configVersions = config('filament-api-forge.versions');
-        $multiVersion   = is_array($configVersions) && ! empty($configVersions);
+        $multiVersion = is_array($configVersions) && ! empty($configVersions);
 
         $currentVersion = null;
-        $versionLinks   = [];
-        $openApiUrl     = route('api-forge.docs.openapi');
+        $versionLinks = [];
+        $openApiUrl = route('api-forge.docs.openapi');
 
         if ($multiVersion) {
             $currentVersion = $request->attributes->get('api_forge_version') ?? $configVersions[0];
@@ -40,7 +40,7 @@ class ApiDocumentationController extends Controller
                 $currentVersion = $configVersions[0];
             }
 
-            $openApiUrl .= '?version=' . $currentVersion;
+            $openApiUrl .= '?version='.$currentVersion;
 
             $base = rtrim(config('filament-api-forge.api_base', 'api'), '/');
             foreach ($configVersions as $v) {
@@ -60,23 +60,23 @@ class ApiDocumentationController extends Controller
         $version ??= $request->query('version') ?? $request->attributes->get('api_forge_version');
 
         $configVersions = config('filament-api-forge.versions');
-        $multiVersion   = is_array($configVersions) && ! empty($configVersions);
+        $multiVersion = is_array($configVersions) && ! empty($configVersions);
 
         if ($multiVersion) {
             $version = in_array($version, $configVersions) ? $version : $configVersions[0];
-            $apiPrefix = rtrim(config('filament-api-forge.api_base', 'api'), '/') . '/' . $version;
+            $apiPrefix = rtrim(config('filament-api-forge.api_base', 'api'), '/').'/'.$version;
         } else {
             $apiPrefix = config('filament-api-forge.api_prefix', 'api/v1');
         }
 
         $resources = $this->discoveryService->discoverForVersion($version);
-        $baseUrl   = url($apiPrefix);
+        $baseUrl = url($apiPrefix);
 
         $paths = [];
 
         // Always-present shared schemas (pagination envelope, errors)
         $schemas = [
-            'PaginationMeta'  => $this->paginationMetaSchema(),
+            'PaginationMeta' => $this->paginationMetaSchema(),
             'PaginationLinks' => $this->paginationLinksSchema(),
         ];
 
@@ -91,46 +91,46 @@ class ApiDocumentationController extends Controller
                 continue;
             }
 
-            $panelId    = $res['panel_id'];
-            $slug       = $res['slug'];
-            $label      = $res['label'];
-            $model      = $res['model_class'];
+            $panelId = $res['panel_id'];
+            $slug = $res['slug'];
+            $label = $res['label'];
+            $model = $res['model_class'];
             $schemaName = class_basename($model);
-            $allowed    = $res['api_config']['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
+            $allowed = $res['api_config']['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
 
             $plural = $this->readAttribute($resourceClass, ApiTag::class)?->name ?? $res['plural_label'];
-            $ops    = $this->readAttribute($resourceClass, ApiOperations::class);
+            $ops = $this->readAttribute($resourceClass, ApiOperations::class);
 
             $schemas[$schemaName] = $this->buildSchema($model);
             $hasUploads = ! empty($res['api_config']['uploads'] ?? []);
-            $uploads    = $res['api_config']['uploads'] ?? [];
+            $uploads = $res['api_config']['uploads'] ?? [];
 
             // Use configured route segment if set, otherwise fall back to panel ID
             $routeSegment = ApiForgeGlobalSetting::get('route_segment') ?? $panelId;
             $base = "/{$routeSegment}/{$slug}";
             $item = "/{$routeSegment}/{$slug}/{id}";
-            $sec  = [['sanctum' => []]];
+            $sec = [['sanctum' => []]];
 
             // ── Collection endpoints: GET /resource  POST /resource ───────
             $colOps = [];
 
             if (in_array('index', $allowed)) {
                 $op = [
-                    'tags'        => [$plural],
-                    'summary'     => $ops?->getSummary('index') ?? "List {$plural}",
-                    'operationId' => 'list' . Str::studly($plural),
-                    'parameters'  => $this->listParams($res),
-                    'responses'   => [
+                    'tags' => [$plural],
+                    'summary' => $ops?->getSummary('index') ?? "List {$plural}",
+                    'operationId' => 'list'.Str::studly($plural),
+                    'parameters' => $this->listParams($res),
+                    'responses' => [
                         '200' => [
                             'description' => "Paginated list of {$plural}.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
-                                    'data'  => [
-                                        'type'  => 'array',
+                                    'data' => [
+                                        'type' => 'array',
                                         'items' => ['$ref' => "#/components/schemas/{$schemaName}"],
                                     ],
-                                    'meta'  => ['$ref' => '#/components/schemas/PaginationMeta'],
+                                    'meta' => ['$ref' => '#/components/schemas/PaginationMeta'],
                                     'links' => ['$ref' => '#/components/schemas/PaginationLinks'],
                                 ],
                             ]]],
@@ -140,7 +140,9 @@ class ApiDocumentationController extends Controller
                     ],
                     'security' => $sec,
                 ];
-                if ($desc = $ops?->getDescription('index')) $op['description'] = $desc;
+                if ($desc = $ops?->getDescription('index')) {
+                    $op['description'] = $desc;
+                }
                 $colOps['get'] = $op;
             }
 
@@ -152,20 +154,20 @@ class ApiDocumentationController extends Controller
                 }
 
                 $op = [
-                    'tags'        => [$plural],
-                    'summary'     => $ops?->getSummary('store') ?? "Create {$label}",
-                    'operationId' => 'create' . Str::studly($label),
+                    'tags' => [$plural],
+                    'summary' => $ops?->getSummary('store') ?? "Create {$label}",
+                    'operationId' => 'create'.Str::studly($label),
                     'requestBody' => $hasUploads
                         ? $this->multipartRequestBody($schemaName, $model, $uploads)
                         : [
                             'required' => true,
-                            'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
+                            'content' => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
                         ],
                     'responses' => [
                         '201' => [
                             'description' => "The created {$label}.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => $storeResponseProps,
                             ]]],
                         ],
@@ -175,35 +177,37 @@ class ApiDocumentationController extends Controller
                     ],
                     'security' => $sec,
                 ];
-                if ($desc = $ops?->getDescription('store')) $op['description'] = $desc;
+                if ($desc = $ops?->getDescription('store')) {
+                    $op['description'] = $desc;
+                }
                 $colOps['post'] = $op;
             }
 
-            if (!empty($colOps)) {
+            if (! empty($colOps)) {
                 $paths[$base] = $colOps;
             }
 
             // ── Item endpoints: GET /resource/{id}  PUT  DELETE ───────────
             $idParam = [
-                'name'        => 'id',
-                'in'          => 'path',
-                'required'    => true,
-                'schema'      => ['type' => 'string'],
+                'name' => 'id',
+                'in' => 'path',
+                'required' => true,
+                'schema' => ['type' => 'string'],
                 'description' => "The {$label} ID.",
             ];
             $itemOps = [];
 
             if (in_array('show', $allowed)) {
                 $op = [
-                    'tags'        => [$plural],
-                    'summary'     => $ops?->getSummary('show') ?? "Get {$label}",
-                    'operationId' => 'get' . Str::studly($label),
-                    'parameters'  => [$idParam],
-                    'responses'   => [
+                    'tags' => [$plural],
+                    'summary' => $ops?->getSummary('show') ?? "Get {$label}",
+                    'operationId' => 'get'.Str::studly($label),
+                    'parameters' => [$idParam],
+                    'responses' => [
                         '200' => [
                             'description' => "The {$label} resource.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
                                     'data' => ['$ref' => "#/components/schemas/{$schemaName}"],
                                 ],
@@ -215,7 +219,9 @@ class ApiDocumentationController extends Controller
                     ],
                     'security' => $sec,
                 ];
-                if ($desc = $ops?->getDescription('show')) $op['description'] = $desc;
+                if ($desc = $ops?->getDescription('show')) {
+                    $op['description'] = $desc;
+                }
                 $itemOps['get'] = $op;
             }
 
@@ -226,21 +232,21 @@ class ApiDocumentationController extends Controller
                 }
 
                 $op = [
-                    'tags'        => [$plural],
-                    'summary'     => $ops?->getSummary('update') ?? "Update {$label}",
-                    'operationId' => 'update' . Str::studly($label),
-                    'parameters'  => [$idParam],
+                    'tags' => [$plural],
+                    'summary' => $ops?->getSummary('update') ?? "Update {$label}",
+                    'operationId' => 'update'.Str::studly($label),
+                    'parameters' => [$idParam],
                     'requestBody' => $hasUploads
                         ? $this->multipartRequestBody($schemaName, $model, $uploads)
                         : [
                             'required' => true,
-                            'content'  => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
+                            'content' => ['application/json' => ['schema' => ['$ref' => "#/components/schemas/{$schemaName}"]]],
                         ],
                     'responses' => [
                         '200' => [
                             'description' => "The updated {$label}.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => $updateResponseProps,
                             ]]],
                         ],
@@ -251,24 +257,26 @@ class ApiDocumentationController extends Controller
                     ],
                     'security' => $sec,
                 ];
-                if ($desc = $ops?->getDescription('update')) $op['description'] = $desc;
+                if ($desc = $ops?->getDescription('update')) {
+                    $op['description'] = $desc;
+                }
                 $itemOps['put'] = $op;
             }
 
             if (in_array('destroy', $allowed)) {
                 $op = [
-                    'tags'        => [$plural],
-                    'summary'     => $ops?->getSummary('destroy') ?? "Delete {$label}",
-                    'operationId' => 'delete' . Str::studly($label),
-                    'parameters'  => [$idParam],
-                    'responses'   => [
+                    'tags' => [$plural],
+                    'summary' => $ops?->getSummary('destroy') ?? "Delete {$label}",
+                    'operationId' => 'delete'.Str::studly($label),
+                    'parameters' => [$idParam],
+                    'responses' => [
                         '200' => [
                             'description' => "{$label} deleted successfully.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
                                     'message' => [
-                                        'type'    => 'string',
+                                        'type' => 'string',
                                         'example' => 'Resource deleted successfully.',
                                     ],
                                 ],
@@ -280,11 +288,13 @@ class ApiDocumentationController extends Controller
                     ],
                     'security' => $sec,
                 ];
-                if ($desc = $ops?->getDescription('destroy')) $op['description'] = $desc;
+                if ($desc = $ops?->getDescription('destroy')) {
+                    $op['description'] = $desc;
+                }
                 $itemOps['delete'] = $op;
             }
 
-            if (!empty($itemOps)) {
+            if (! empty($itemOps)) {
                 $paths[$item] = $itemOps;
             }
 
@@ -293,27 +303,27 @@ class ApiDocumentationController extends Controller
 
             foreach ($this->discoveryService->getActions($resourceClass) as $action) {
                 $httpMethod = strtolower($action['method']);
-                $isRecord   = $action['record'] ?? true;
+                $isRecord = $action['record'] ?? true;
 
                 $actionPath = $isRecord
                     ? "{$item}/{$actionsPrefix}/{$action['name']}"
                     : "{$base}/{$actionsPrefix}/{$action['name']}";
 
                 $paths[$actionPath][$httpMethod] = [
-                    'tags'        => [$plural],
-                    'summary'     => Str::headline($action['name']) . " — {$label}",
-                    'operationId' => Str::camel($action['name']) . Str::studly($label) . 'Action',
+                    'tags' => [$plural],
+                    'summary' => Str::headline($action['name'])." — {$label}",
+                    'operationId' => Str::camel($action['name']).Str::studly($label).'Action',
                     'description' => "Custom action. Requires the **{$action['scope']}** scope.",
-                    'parameters'  => $isRecord ? [$idParam] : [],
-                    'responses'   => [
+                    'parameters' => $isRecord ? [$idParam] : [],
+                    'responses' => [
                         '200' => [
                             'description' => "Action '{$action['name']}' executed successfully.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
                                     'message' => ['type' => 'string'],
-                                    'action'  => ['type' => 'string', 'example' => $action['name']],
-                                    'result'  => ['description' => 'Value returned by the action method.'],
+                                    'action' => ['type' => 'string', 'example' => $action['name']],
+                                    'result' => ['description' => 'Value returned by the action method.'],
                                 ],
                             ]]],
                         ],
@@ -328,16 +338,16 @@ class ApiDocumentationController extends Controller
             // ── Soft delete endpoints ─────────────────────────────────────
             if (in_array('restore', $allowed)) {
                 $paths["{$item}/restore"]['post'] = [
-                    'tags'        => [$plural],
-                    'summary'     => "Restore {$label}",
-                    'operationId' => 'restore' . Str::studly($label),
+                    'tags' => [$plural],
+                    'summary' => "Restore {$label}",
+                    'operationId' => 'restore'.Str::studly($label),
                     'description' => 'Restore a soft-deleted record. Requires the **write** scope.',
-                    'parameters'  => [$idParam],
-                    'responses'   => [
+                    'parameters' => [$idParam],
+                    'responses' => [
                         '200' => [
                             'description' => "The restored {$label}.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => ['data' => ['$ref' => "#/components/schemas/{$schemaName}"]],
                             ]]],
                         ],
@@ -351,16 +361,16 @@ class ApiDocumentationController extends Controller
 
             if (in_array('forceDelete', $allowed)) {
                 $paths["{$item}/force"]['delete'] = [
-                    'tags'        => [$plural],
-                    'summary'     => "Permanently delete {$label}",
-                    'operationId' => 'forceDelete' . Str::studly($label),
+                    'tags' => [$plural],
+                    'summary' => "Permanently delete {$label}",
+                    'operationId' => 'forceDelete'.Str::studly($label),
                     'description' => 'Permanently delete a (soft-deleted) record. Requires the **delete** scope.',
-                    'parameters'  => [$idParam],
-                    'responses'   => [
+                    'parameters' => [$idParam],
+                    'responses' => [
                         '200' => [
                             'description' => "{$label} permanently deleted.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
                                     'message' => ['type' => 'string', 'example' => 'Resource permanently deleted.'],
                                     'deleted' => ['type' => 'boolean'],
@@ -378,16 +388,16 @@ class ApiDocumentationController extends Controller
             // ── Export endpoint ───────────────────────────────────────────
             if (in_array('export', $allowed) && config('filament-api-forge.export.enabled', true)) {
                 $paths["{$base}/export"]['get'] = [
-                    'tags'        => [$plural],
-                    'summary'     => "Export {$plural}",
-                    'operationId' => 'export' . Str::studly($plural),
+                    'tags' => [$plural],
+                    'summary' => "Export {$plural}",
+                    'operationId' => 'export'.Str::studly($plural),
                     'description' => 'Export the filtered result set as CSV or JSON. Requires the **read** scope.',
-                    'parameters'  => array_merge(
+                    'parameters' => array_merge(
                         [[
-                            'name'     => 'format',
-                            'in'       => 'query',
+                            'name' => 'format',
+                            'in' => 'query',
                             'required' => false,
-                            'schema'   => ['type' => 'string', 'enum' => config('filament-api-forge.export.formats', ['csv', 'json']), 'default' => 'csv'],
+                            'schema' => ['type' => 'string', 'enum' => config('filament-api-forge.export.formats', ['csv', 'json']), 'default' => 'csv'],
                         ]],
                         $this->listParams($res),
                     ),
@@ -409,14 +419,14 @@ class ApiDocumentationController extends Controller
                 $rowRef = ['$ref' => "#/components/schemas/{$schemaName}"];
 
                 $paths["{$base}/batch"]['post'] = [
-                    'tags'        => [$plural],
-                    'summary'     => "Batch operations — {$plural}",
-                    'operationId' => 'batch' . Str::studly($plural),
+                    'tags' => [$plural],
+                    'summary' => "Batch operations — {$plural}",
+                    'operationId' => 'batch'.Str::studly($plural),
                     'description' => 'Transaction-wrapped bulk create, update and delete.',
                     'requestBody' => [
                         'required' => true,
-                        'content'  => ['application/json' => ['schema' => [
-                            'type'       => 'object',
+                        'content' => ['application/json' => ['schema' => [
+                            'type' => 'object',
                             'properties' => [
                                 'create' => ['type' => 'array', 'items' => $rowRef],
                                 'update' => ['type' => 'array', 'items' => $rowRef],
@@ -427,14 +437,14 @@ class ApiDocumentationController extends Controller
                     'responses' => [
                         '200' => [
                             'description' => 'Batch operation completed.',
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
                                     'message' => ['type' => 'string', 'example' => 'Batch operation completed.'],
                                     'created' => ['type' => 'array', 'items' => ['type' => 'integer']],
                                     'updated' => ['type' => 'array', 'items' => ['type' => 'integer']],
                                     'deleted' => ['type' => 'array', 'items' => ['type' => 'integer']],
-                                    'failed'  => ['type' => 'array', 'items' => ['type' => 'object']],
+                                    'failed' => ['type' => 'array', 'items' => ['type' => 'object']],
                                 ],
                             ]]],
                         ],
@@ -449,18 +459,18 @@ class ApiDocumentationController extends Controller
             // ── Nested resource endpoints ─────────────────────────────────
             foreach ($res['api_config']['relations'] ?? [] as $childSlug => $relation) {
                 $childAllowed = $relation['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
-                $childBase    = "{$item}/{$childSlug}";
-                $childItem    = "{$childBase}/{childId}";
-                $childLabel   = Str::headline(Str::singular($childSlug));
+                $childBase = "{$item}/{$childSlug}";
+                $childItem = "{$childBase}/{childId}";
+                $childLabel = Str::headline(Str::singular($childSlug));
                 $childIdParam = [
-                    'name'        => 'childId',
-                    'in'          => 'path',
-                    'required'    => true,
-                    'schema'      => ['type' => 'string'],
+                    'name' => 'childId',
+                    'in' => 'path',
+                    'required' => true,
+                    'schema' => ['type' => 'string'],
                     'description' => "The {$childLabel} ID.",
                 ];
                 $genericChild = ['type' => 'object', 'description' => "{$childLabel} attributes."];
-                $childOpId    = Str::studly($label) . Str::studly($childSlug);
+                $childOpId = Str::studly($label).Str::studly($childSlug);
 
                 $nestedResponses = [
                     '404' => ['$ref' => '#/components/responses/NotFound'],
@@ -470,17 +480,17 @@ class ApiDocumentationController extends Controller
 
                 if (in_array('index', $childAllowed)) {
                     $paths[$childBase]['get'] = [
-                        'tags'        => [$plural],
-                        'summary'     => "List {$childSlug} of {$label}",
-                        'operationId' => 'list' . $childOpId,
-                        'parameters'  => [$idParam],
-                        'responses'   => ['200' => [
+                        'tags' => [$plural],
+                        'summary' => "List {$childSlug} of {$label}",
+                        'operationId' => 'list'.$childOpId,
+                        'parameters' => [$idParam],
+                        'responses' => ['200' => [
                             'description' => "Paginated {$childSlug} of the {$label}.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => [
-                                    'data'  => ['type' => 'array', 'items' => $genericChild],
-                                    'meta'  => ['$ref' => '#/components/schemas/PaginationMeta'],
+                                    'data' => ['type' => 'array', 'items' => $genericChild],
+                                    'meta' => ['$ref' => '#/components/schemas/PaginationMeta'],
                                     'links' => ['$ref' => '#/components/schemas/PaginationLinks'],
                                 ],
                             ]]],
@@ -491,14 +501,14 @@ class ApiDocumentationController extends Controller
 
                 if (in_array('store', $childAllowed)) {
                     $paths[$childBase]['post'] = [
-                        'tags'        => [$plural],
-                        'summary'     => "Create {$childLabel} for {$label}",
-                        'operationId' => 'create' . $childOpId,
-                        'parameters'  => [$idParam],
+                        'tags' => [$plural],
+                        'summary' => "Create {$childLabel} for {$label}",
+                        'operationId' => 'create'.$childOpId,
+                        'parameters' => [$idParam],
                         'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => $genericChild]]],
-                        'responses'   => ['200' => [
+                        'responses' => ['200' => [
                             'description' => "The created {$childLabel}.",
-                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                            'content' => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
                         ], '422' => ['$ref' => '#/components/responses/ValidationError']] + $nestedResponses,
                         'security' => $sec,
                     ];
@@ -506,13 +516,13 @@ class ApiDocumentationController extends Controller
 
                 if (in_array('show', $childAllowed)) {
                     $paths[$childItem]['get'] = [
-                        'tags'        => [$plural],
-                        'summary'     => "Get {$childLabel} of {$label}",
-                        'operationId' => 'get' . $childOpId,
-                        'parameters'  => [$idParam, $childIdParam],
-                        'responses'   => ['200' => [
+                        'tags' => [$plural],
+                        'summary' => "Get {$childLabel} of {$label}",
+                        'operationId' => 'get'.$childOpId,
+                        'parameters' => [$idParam, $childIdParam],
+                        'responses' => ['200' => [
                             'description' => "The {$childLabel}.",
-                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                            'content' => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
                         ]] + $nestedResponses,
                         'security' => $sec,
                     ];
@@ -520,14 +530,14 @@ class ApiDocumentationController extends Controller
 
                 if (in_array('update', $childAllowed)) {
                     $paths[$childItem]['put'] = [
-                        'tags'        => [$plural],
-                        'summary'     => "Update {$childLabel} of {$label}",
-                        'operationId' => 'update' . $childOpId,
-                        'parameters'  => [$idParam, $childIdParam],
+                        'tags' => [$plural],
+                        'summary' => "Update {$childLabel} of {$label}",
+                        'operationId' => 'update'.$childOpId,
+                        'parameters' => [$idParam, $childIdParam],
                         'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => $genericChild]]],
-                        'responses'   => ['200' => [
+                        'responses' => ['200' => [
                             'description' => "The updated {$childLabel}.",
-                            'content'     => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
+                            'content' => ['application/json' => ['schema' => ['type' => 'object', 'properties' => ['data' => $genericChild]]]],
                         ], '422' => ['$ref' => '#/components/responses/ValidationError']] + $nestedResponses,
                         'security' => $sec,
                     ];
@@ -535,14 +545,14 @@ class ApiDocumentationController extends Controller
 
                 if (in_array('destroy', $childAllowed)) {
                     $paths[$childItem]['delete'] = [
-                        'tags'        => [$plural],
-                        'summary'     => "Delete {$childLabel} of {$label}",
-                        'operationId' => 'delete' . $childOpId,
-                        'parameters'  => [$idParam, $childIdParam],
-                        'responses'   => ['200' => [
+                        'tags' => [$plural],
+                        'summary' => "Delete {$childLabel} of {$label}",
+                        'operationId' => 'delete'.$childOpId,
+                        'parameters' => [$idParam, $childIdParam],
+                        'responses' => ['200' => [
                             'description' => "{$childLabel} deleted successfully.",
-                            'content'     => ['application/json' => ['schema' => [
-                                'type'       => 'object',
+                            'content' => ['application/json' => ['schema' => [
+                                'type' => 'object',
                                 'properties' => ['message' => ['type' => 'string'], 'deleted' => ['type' => 'boolean']],
                             ]]],
                         ]] + $nestedResponses,
@@ -556,26 +566,26 @@ class ApiDocumentationController extends Controller
         if (config('filament-api-forge.auth.enabled', true)) {
             $tokenResponse = fn (array $extra = []) => [
                 'description' => 'The new token pair. Store it now — it is shown only once.',
-                'content'     => ['application/json' => ['schema' => [
-                    'type'       => 'object',
+                'content' => ['application/json' => ['schema' => [
+                    'type' => 'object',
                     'properties' => array_merge([
-                        'message'    => ['type' => 'string'],
-                        'token'      => ['type' => 'string', 'example' => 'forge_xxxxxxxxxxxxxxxxxxxx'],
+                        'message' => ['type' => 'string'],
+                        'token' => ['type' => 'string', 'example' => 'forge_xxxxxxxxxxxxxxxxxxxx'],
                         'expires_at' => ['type' => 'string', 'format' => 'date-time'],
                     ], $extra),
                 ]]],
             ];
 
             $paths['/auth/token/refresh']['post'] = [
-                'tags'        => ['Authentication'],
-                'summary'     => 'Refresh an access token',
+                'tags' => ['Authentication'],
+                'summary' => 'Refresh an access token',
                 'operationId' => 'refreshToken',
                 'description' => 'Exchange a `forge_refresh_` token for a new access + refresh token pair. Works even after the access token has expired. Requires `auth.refresh_tokens` to be enabled.',
                 'requestBody' => [
                     'required' => true,
-                    'content'  => ['application/json' => ['schema' => [
-                        'type'       => 'object',
-                        'required'   => ['refresh_token'],
+                    'content' => ['application/json' => ['schema' => [
+                        'type' => 'object',
+                        'required' => ['refresh_token'],
                         'properties' => [
                             'refresh_token' => ['type' => 'string', 'example' => 'forge_refresh_xxxxxxxxxxxx'],
                         ],
@@ -588,11 +598,11 @@ class ApiDocumentationController extends Controller
             ];
 
             $paths['/auth/token/rotate']['post'] = [
-                'tags'        => ['Authentication'],
-                'summary'     => 'Rotate the current access token',
+                'tags' => ['Authentication'],
+                'summary' => 'Rotate the current access token',
                 'operationId' => 'rotateToken',
                 'description' => 'Replace the authenticated access token with a fresh one. The old token stops working immediately.',
-                'responses'   => [
+                'responses' => [
                     '200' => $tokenResponse(),
                     '401' => ['$ref' => '#/components/responses/Unauthenticated'],
                 ],
@@ -604,21 +614,25 @@ class ApiDocumentationController extends Controller
         foreach (Route::getRoutes() as $route) {
             $uri = $route->uri();
 
-            if (Str::startsWith($uri, 'api/') && !Str::contains($uri, '{panelId}')) {
+            if (Str::startsWith($uri, 'api/') && ! Str::contains($uri, '{panelId}')) {
                 $cleanUri = Str::after($uri, 'api/');
-                if (empty($cleanUri)) continue;
+                if (empty($cleanUri)) {
+                    continue;
+                }
 
-                $docPath = '/' . ltrim($cleanUri, '/');
-                if (isset($paths[$docPath])) continue;
+                $docPath = '/'.ltrim($cleanUri, '/');
+                if (isset($paths[$docPath])) {
+                    continue;
+                }
 
                 $methods = array_map('strtolower', array_filter($route->methods(), fn ($m) => $m !== 'HEAD'));
 
                 foreach ($methods as $method) {
                     $paths[$docPath][$method] = [
-                        'tags'        => ['General API'],
-                        'summary'     => "External API: {$uri}",
-                        'operationId' => 'external' . Str::studly(str_replace(['/', '{', '}', '-'], '', $uri)) . $method,
-                        'responses'   => ['200' => ['description' => 'OK']],
+                        'tags' => ['General API'],
+                        'summary' => "External API: {$uri}",
+                        'operationId' => 'external'.Str::studly(str_replace(['/', '{', '}', '-'], '', $uri)).$method,
+                        'responses' => ['200' => ['description' => 'OK']],
                     ];
 
                     $mw = $route->gatherMiddleware();
@@ -631,16 +645,16 @@ class ApiDocumentationController extends Controller
 
         return response()->json([
             'openapi' => '3.0.3',
-            'info'    => [
-                'title'       => config('filament-api-forge.docs.title', 'API Documentation'),
+            'info' => [
+                'title' => config('filament-api-forge.docs.title', 'API Documentation'),
                 'description' => config('filament-api-forge.docs.description', ''),
-                'version'     => $version ?? config('filament-api-forge.api_version', 'v1'),
+                'version' => $version ?? config('filament-api-forge.api_version', 'v1'),
             ],
-            'servers'    => [['url' => $baseUrl, 'description' => 'Current Server']],
-            'paths'      => $paths,
+            'servers' => [['url' => $baseUrl, 'description' => 'Current Server']],
+            'paths' => $paths,
             'components' => [
-                'schemas'         => $schemas,
-                'responses'       => $responseComponents,
+                'schemas' => $schemas,
+                'responses' => $responseComponents,
                 'securitySchemes' => [
                     'sanctum' => ['type' => 'http', 'scheme' => 'bearer', 'bearerFormat' => 'API Token'],
                 ],
@@ -653,15 +667,15 @@ class ApiDocumentationController extends Controller
     protected function paginationMetaSchema(): array
     {
         return [
-            'type'       => 'object',
+            'type' => 'object',
             'properties' => [
                 'current_page' => ['type' => 'integer', 'example' => 1],
-                'from'         => ['type' => 'integer', 'nullable' => true, 'example' => 1],
-                'last_page'    => ['type' => 'integer', 'example' => 1],
-                'path'         => ['type' => 'string',  'example' => '/api/v1/admin/posts'],
-                'per_page'     => ['type' => 'integer', 'example' => 15],
-                'to'           => ['type' => 'integer', 'nullable' => true, 'example' => 1],
-                'total'        => ['type' => 'integer', 'example' => 1],
+                'from' => ['type' => 'integer', 'nullable' => true, 'example' => 1],
+                'last_page' => ['type' => 'integer', 'example' => 1],
+                'path' => ['type' => 'string',  'example' => '/api/v1/admin/posts'],
+                'per_page' => ['type' => 'integer', 'example' => 15],
+                'to' => ['type' => 'integer', 'nullable' => true, 'example' => 1],
+                'total' => ['type' => 'integer', 'example' => 1],
             ],
         ];
     }
@@ -669,12 +683,12 @@ class ApiDocumentationController extends Controller
     protected function paginationLinksSchema(): array
     {
         return [
-            'type'       => 'object',
+            'type' => 'object',
             'properties' => [
                 'first' => ['type' => 'string', 'nullable' => true, 'example' => '/api/v1/admin/posts?page=1'],
-                'last'  => ['type' => 'string', 'nullable' => true, 'example' => '/api/v1/admin/posts?page=1'],
-                'prev'  => ['type' => 'string', 'nullable' => true, 'example' => null],
-                'next'  => ['type' => 'string', 'nullable' => true, 'example' => null],
+                'last' => ['type' => 'string', 'nullable' => true, 'example' => '/api/v1/admin/posts?page=1'],
+                'prev' => ['type' => 'string', 'nullable' => true, 'example' => null],
+                'next' => ['type' => 'string', 'nullable' => true, 'example' => null],
             ],
         ];
     }
@@ -686,7 +700,7 @@ class ApiDocumentationController extends Controller
     protected function standardResponses(): array
     {
         $simple = fn (string $msg) => [
-            'type'       => 'object',
+            'type' => 'object',
             'properties' => [
                 'message' => ['type' => 'string', 'example' => $msg],
             ],
@@ -695,26 +709,26 @@ class ApiDocumentationController extends Controller
         return [
             'Unauthenticated' => [
                 'description' => 'Unauthenticated — no token or invalid token provided.',
-                'content'     => ['application/json' => ['schema' => $simple('Unauthenticated.')]],
+                'content' => ['application/json' => ['schema' => $simple('Unauthenticated.')]],
             ],
             'Forbidden' => [
                 'description' => 'Forbidden — token does not have the required scope.',
-                'content'     => ['application/json' => ['schema' => $simple('This action is unauthorized.')]],
+                'content' => ['application/json' => ['schema' => $simple('This action is unauthorized.')]],
             ],
             'NotFound' => [
                 'description' => 'Not Found — the requested resource does not exist.',
-                'content'     => ['application/json' => ['schema' => $simple('No query results for model.')]],
+                'content' => ['application/json' => ['schema' => $simple('No query results for model.')]],
             ],
             'ValidationError' => [
                 'description' => 'Unprocessable Content — validation failed.',
-                'content'     => ['application/json' => ['schema' => [
-                    'type'       => 'object',
+                'content' => ['application/json' => ['schema' => [
+                    'type' => 'object',
                     'properties' => [
                         'message' => ['type' => 'string', 'example' => 'The given data was invalid.'],
-                        'errors'  => [
-                            'type'                 => 'object',
+                        'errors' => [
+                            'type' => 'object',
                             'additionalProperties' => [
-                                'type'  => 'array',
+                                'type' => 'array',
                                 'items' => ['type' => 'string'],
                             ],
                             'example' => ['field' => ['The field is required.']],
@@ -736,15 +750,16 @@ class ApiDocumentationController extends Controller
         foreach ($res['api_config']['allowed_filters'] ?? [] as $f) {
             $p[] = ['name' => "filter[{$f}]", 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string'], 'description' => "Filter by {$f}"];
         }
-        if (!empty($res['api_config']['allowed_sorts'] ?? [])) {
+        if (! empty($res['api_config']['allowed_sorts'] ?? [])) {
             $p[] = ['name' => 'sort', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string'], 'description' => 'Sort field (prefix - for desc). E.g. -created_at'];
         }
-        if (!empty($res['api_config']['allowed_includes'] ?? [])) {
+        if (! empty($res['api_config']['allowed_includes'] ?? [])) {
             $p[] = ['name' => 'include', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string'], 'description' => 'Comma-separated relations to include. E.g. author,comments'];
         }
-        if (!empty($res['api_config']['allowed_fields'] ?? [])) {
+        if (! empty($res['api_config']['allowed_fields'] ?? [])) {
             $p[] = ['name' => 'fields', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string'], 'description' => 'Sparse fieldsets — comma-separated list of fields to return'];
         }
+
         return $p;
     }
 
@@ -754,7 +769,7 @@ class ApiDocumentationController extends Controller
     {
         $props = ['id' => ['type' => 'integer', 'readOnly' => true, 'example' => 1]];
         try {
-            $m = new $modelClass();
+            $m = new $modelClass;
             foreach ($m->getFillable() as $field) {
                 $props[$field] = ['type' => 'string'];
             }
@@ -762,7 +777,9 @@ class ApiDocumentationController extends Controller
                 $props['created_at'] = ['type' => 'string', 'format' => 'date-time', 'readOnly' => true];
                 $props['updated_at'] = ['type' => 'string', 'format' => 'date-time', 'readOnly' => true];
             }
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
+
         return ['type' => 'object', 'properties' => $props];
     }
 
@@ -772,15 +789,17 @@ class ApiDocumentationController extends Controller
      * Read a PHP 8 attribute instance from a class.
      *
      * @template T
-     * @param  class-string       $class
-     * @param  class-string<T>    $attributeClass
+     *
+     * @param  class-string  $class
+     * @param  class-string<T>  $attributeClass
      * @return T|null
      */
     protected function readAttribute(string $class, string $attributeClass): mixed
     {
         try {
-            $ref   = new \ReflectionClass($class);
+            $ref = new \ReflectionClass($class);
             $attrs = $ref->getAttributes($attributeClass);
+
             return $attrs ? $attrs[0]->newInstance() : null;
         } catch (\Throwable) {
             return null;
@@ -803,10 +822,10 @@ class ApiDocumentationController extends Controller
      */
     protected function multipartRequestBody(string $schemaName, string $modelClass, array $uploads): array
     {
-        $modelSchema  = $this->buildSchema($modelClass);
-        $modelProps   = $modelSchema['properties'] ?? [];
+        $modelSchema = $this->buildSchema($modelClass);
+        $modelProps = $modelSchema['properties'] ?? [];
         $uploadFields = array_keys($uploads);
-        $properties   = [];
+        $properties = [];
 
         // Flatten model properties as form-data fields, exclude upload fields + readOnly fields
         foreach ($modelProps as $name => $prop) {
@@ -818,7 +837,7 @@ class ApiDocumentationController extends Controller
             }
 
             $formField = [
-                'type'        => $prop['type'] ?? 'string',
+                'type' => $prop['type'] ?? 'string',
                 'description' => $prop['description'] ?? "The {$name} value.",
             ];
 
@@ -831,8 +850,8 @@ class ApiDocumentationController extends Controller
 
         // Add file upload fields with format: binary
         foreach ($uploads as $field => $config) {
-            $multiple    = $config['multiple'] ?? false;
-            $description = $multiple ? "File upload. Multiple files accepted." : "File upload. Single file.";
+            $multiple = $config['multiple'] ?? false;
+            $description = $multiple ? 'File upload. Multiple files accepted.' : 'File upload. Single file.';
 
             if (isset($config['rules'])) {
                 $rules = is_array($config['rules']) ? implode(', ', $config['rules']) : $config['rules'];
@@ -840,8 +859,8 @@ class ApiDocumentationController extends Controller
             }
 
             $fileProp = [
-                'type'        => $multiple ? 'array' : 'string',
-                'format'      => 'binary',
+                'type' => $multiple ? 'array' : 'string',
+                'format' => 'binary',
                 'description' => trim($description),
             ];
 
@@ -854,10 +873,10 @@ class ApiDocumentationController extends Controller
 
         return [
             'required' => true,
-            'content'  => [
+            'content' => [
                 'multipart/form-data' => [
                     'schema' => [
-                        'type'       => 'object',
+                        'type' => 'object',
                         'properties' => $properties,
                     ],
                 ],
@@ -877,27 +896,27 @@ class ApiDocumentationController extends Controller
 
             if ($multiple) {
                 $properties[$field] = [
-                    'type'        => 'object',
+                    'type' => 'object',
                     'description' => "Upload result for '{$field}' (multiple files).",
-                    'properties'  => [
-                        'urls'  => [
-                            'type'        => 'array',
-                            'items'       => ['type' => 'string', 'format' => 'uri'],
+                    'properties' => [
+                        'urls' => [
+                            'type' => 'array',
+                            'items' => ['type' => 'string', 'format' => 'uri'],
                             'description' => 'Array of file URLs.',
                         ],
                         'uuids' => [
-                            'type'        => 'array',
-                            'items'       => ['type' => 'string'],
+                            'type' => 'array',
+                            'items' => ['type' => 'string'],
                             'description' => 'Array of media UUIDs (Spatie Media Library only).',
                         ],
                     ],
                 ];
             } else {
                 $properties[$field] = [
-                    'type'        => 'object',
+                    'type' => 'object',
                     'description' => "Upload result for '{$field}'.",
-                    'properties'  => [
-                        'url'  => ['type' => 'string', 'format' => 'uri', 'description' => 'Public URL of the uploaded file.'],
+                    'properties' => [
+                        'url' => ['type' => 'string', 'format' => 'uri', 'description' => 'Public URL of the uploaded file.'],
                         'uuid' => ['type' => 'string', 'description' => 'Media UUID (Spatie Media Library only).'],
                     ],
                 ];
@@ -905,9 +924,9 @@ class ApiDocumentationController extends Controller
         }
 
         return [
-            'type'        => 'object',
+            'type' => 'object',
             'description' => 'Upload results keyed by field name. Present only when the request included files.',
-            'properties'  => $properties,
+            'properties' => $properties,
         ];
     }
 }

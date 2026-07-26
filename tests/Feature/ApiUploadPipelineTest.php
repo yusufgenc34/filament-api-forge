@@ -1,23 +1,25 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
-use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
-use YusufGenc34\FilamentApiForge\Services\FileUploadService;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
+use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 // ── A model that represents a Filament Resource's backing model ────────────
 
 class UploadDemoModel extends Model
 {
     protected $table = 'upload_demo';
+
     protected $fillable = ['title', 'body', 'avatar', 'gallery'];
+
     protected $casts = ['gallery' => 'array'];
 }
 
@@ -34,20 +36,20 @@ beforeEach(function () {
     });
 
     $this->user = User::create([
-        'name'     => 'Demo User',
-        'email'    => 'demo@example.com',
+        'name' => 'Demo User',
+        'email' => 'demo@example.com',
         'password' => bcrypt('password'),
     ]);
 
     // Valid token with write scope
-    $plain = 'forge_' . str_repeat('z', 40);
+    $plain = 'forge_'.str_repeat('z', 40);
     $this->token = ApiForgeToken::create([
-        'user_id'      => $this->user->id,
-        'name'         => 'Upload Token',
-        'token_hash'   => hash('sha256', $plain),
+        'user_id' => $this->user->id,
+        'name' => 'Upload Token',
+        'token_hash' => hash('sha256', $plain),
         'token_prefix' => substr($plain, 0, 16),
-        'scopes'       => ['read', 'write'],
-        'is_active'    => true,
+        'scopes' => ['read', 'write'],
+        'is_active' => true,
     ]);
     $this->plainToken = $plain;
 });
@@ -58,25 +60,25 @@ function mockResourceConfig(string $modelClass, array $overrides = []): array
 {
     return array_merge([
         'resource_class' => 'App\\Filament\\Resources\\UploadDemoResource',
-        'model_class'    => $modelClass,
-        'slug'           => 'upload-demos',
-        'panel_id'       => 'admin',
-        'label'          => 'Upload Demo',
-        'plural_label'   => 'Upload Demos',
-        'api_config'     => [
+        'model_class' => $modelClass,
+        'slug' => 'upload-demos',
+        'panel_id' => 'admin',
+        'label' => 'Upload Demo',
+        'plural_label' => 'Upload Demos',
+        'api_config' => [
             'allowed_methods' => ['index', 'show', 'store', 'update', 'destroy'],
-            'scopes'          => ['read', 'write', 'delete'],
-            'allowed_fields'  => ['id', 'title', 'body', 'avatar', 'gallery'],
+            'scopes' => ['read', 'write', 'delete'],
+            'allowed_fields' => ['id', 'title', 'body', 'avatar', 'gallery'],
             // ★ This is what the Filament Resource defines in apiConfig()
             'uploads' => [
                 'avatar' => [
-                    'disk'       => 'public',
-                    'rules'      => 'image|max:2048',
+                    'disk' => 'public',
+                    'rules' => 'image|max:2048',
                 ],
                 'gallery' => [
-                    'disk'       => 'public',
-                    'rules'      => 'image|max:5120',
-                    'multiple'   => true,
+                    'disk' => 'public',
+                    'rules' => 'image|max:5120',
+                    'multiple' => true,
                 ],
             ],
         ],
@@ -100,7 +102,7 @@ it('store: discovers upload config, validates file, saves via FileUploadService'
     $file = UploadedFile::fake()->image('photo.jpg', 800, 600);
     $request = Request::create('/api/v1/admin/upload-demos', 'POST', [
         'title' => 'My Photo Post',
-        'body'  => 'Check out this photo',
+        'body' => 'Check out this photo',
     ], [], [
         'avatar' => $file,
     ]);
@@ -181,8 +183,8 @@ it('store: works normally when resource has no upload config', function () {
         ->andReturn(mockResourceConfig(UploadDemoModel::class, [
             'api_config' => [
                 'allowed_methods' => ['index', 'show', 'store'],
-                'scopes'          => ['read', 'write'],
-                'allowed_fields'  => ['id', 'title', 'body'],
+                'scopes' => ['read', 'write'],
+                'allowed_fields' => ['id', 'title', 'body'],
                 // ★ NO uploads key
             ],
         ]));
@@ -212,8 +214,8 @@ it('store: works normally when resource has no upload config', function () {
 
 it('update: handles file upload on existing record', function () {
     $existing = UploadDemoModel::create([
-        'title'  => 'Old Title',
-        'body'   => 'Old body',
+        'title' => 'Old Title',
+        'body' => 'Old body',
         'avatar' => 'avatars/old.jpg',
     ]);
 
@@ -275,7 +277,7 @@ it('store: rejects non-image file when rules require image', function () {
     try {
         $controller->store($request, 'admin', 'upload-demos');
         $this->fail('Expected validation exception was not thrown');
-    } catch (\Illuminate\Validation\ValidationException $e) {
+    } catch (ValidationException $e) {
         expect($e->errors())->toHaveKey('avatar');
     }
 

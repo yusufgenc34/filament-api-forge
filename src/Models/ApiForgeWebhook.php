@@ -20,9 +20,9 @@ class ApiForgeWebhook extends Model
     ];
 
     protected $casts = [
-        'events'            => 'array',
-        'is_active'         => 'boolean',
-        'failure_count'     => 'integer',
+        'events' => 'array',
+        'is_active' => 'boolean',
+        'failure_count' => 'integer',
         'last_triggered_at' => 'datetime',
     ];
 

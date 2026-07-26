@@ -1,11 +1,10 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 
 beforeEach(function () {
     if (! Schema::hasTable('test_models')) {
@@ -24,6 +23,7 @@ beforeEach(function () {
 $testModelClass = new class extends Model
 {
     protected $table = 'test_models';
+
     protected $fillable = ['title', 'body', 'status'];
 };
 
@@ -31,8 +31,8 @@ it('creates a record via Eloquent', function () use ($testModelClass) {
     $modelClass = get_class($testModelClass);
 
     $record = $modelClass::create([
-        'title'  => 'Hello World',
-        'body'   => 'Test body content',
+        'title' => 'Hello World',
+        'body' => 'Test body content',
         'status' => 'draft',
     ]);
 
@@ -48,8 +48,8 @@ it('updates a record via Eloquent', function () use ($testModelClass) {
     $modelClass = get_class($testModelClass);
 
     $record = $modelClass::create([
-        'title'  => 'Original Title',
-        'body'   => 'Original body',
+        'title' => 'Original Title',
+        'body' => 'Original body',
         'status' => 'draft',
     ]);
 
@@ -64,8 +64,8 @@ it('deletes a record via Eloquent', function () use ($testModelClass) {
     $modelClass = get_class($testModelClass);
 
     $record = $modelClass::create([
-        'title'  => 'To Delete',
-        'body'   => 'Will be deleted',
+        'title' => 'To Delete',
+        'body' => 'Will be deleted',
         'status' => 'draft',
     ]);
 
@@ -80,7 +80,7 @@ it('deletes a record via Eloquent', function () use ($testModelClass) {
 it('ApiForgeJsonResource wraps single model with meta', function () use ($testModelClass) {
     $modelClass = get_class($testModelClass);
 
-    $model = new $modelClass();
+    $model = new $modelClass;
     $model->fill(['title' => 'Test', 'body' => 'Content', 'status' => 'published']);
 
     $resource = new ApiForgeJsonResource($model);
@@ -115,10 +115,10 @@ it('ApiForgeJsonResource collection wraps paginated results', function () use ($
 it('ApiForgeJsonResource includes loaded relations', function () use ($testModelClass) {
     $modelClass = get_class($testModelClass);
 
-    $parent = new $modelClass();
+    $parent = new $modelClass;
     $parent->fill(['title' => 'With Relations']);
 
-    $child = new $modelClass();
+    $child = new $modelClass;
     $child->fill(['title' => 'Child']);
     $parent->setRelation('children', collect([$child]));
 
@@ -136,13 +136,13 @@ it('controller scope map maps HTTP methods correctly', function () {
     $scopeMap = $ref->getConstant('SCOPE_MAP');
 
     expect($scopeMap)->toBe([
-        'index'       => 'read',
-        'show'        => 'read',
-        'export'      => 'read',
-        'store'       => 'write',
-        'update'      => 'write',
-        'restore'     => 'write',
-        'destroy'     => 'delete',
+        'index' => 'read',
+        'show' => 'read',
+        'export' => 'read',
+        'store' => 'write',
+        'update' => 'write',
+        'restore' => 'write',
+        'destroy' => 'delete',
         'forceDelete' => 'delete',
     ]);
 });

@@ -18,10 +18,10 @@ class ApiForgeResourceSetting extends Model
     ];
 
     protected $casts = [
-        'enabled'          => 'boolean',
-        'allowed_ips'      => 'array',
+        'enabled' => 'boolean',
+        'allowed_ips' => 'array',
         'disabled_methods' => 'array',
-        'method_settings'  => 'array',
+        'method_settings' => 'array',
     ];
 
     public static function forResource(string $resourceClass): self
@@ -49,18 +49,20 @@ class ApiForgeResourceSetting extends Model
         if (in_array($method, $disabled)) {
             $disabled = array_values(array_filter($disabled, fn ($m) => $m !== $method));
             $this->update(['disabled_methods' => $disabled]);
+
             return true;
         }
 
         $disabled[] = $method;
         $this->update(['disabled_methods' => array_values($disabled)]);
+
         return false;
     }
 
     public function saveSettings(?int $rateLimit, array $allowedIps): void
     {
         $this->update([
-            'rate_limit'  => $rateLimit ?: null,
+            'rate_limit' => $rateLimit ?: null,
             'allowed_ips' => $allowedIps,
         ]);
     }
@@ -68,14 +70,15 @@ class ApiForgeResourceSetting extends Model
     public function getMethodConfig(string $method): array
     {
         $settings = $this->method_settings ?? [];
+
         return $settings[$method] ?? ['rate_limit' => null, 'allowed_ips' => []];
     }
 
     public function saveMethodConfig(string $method, ?int $rateLimit, array $allowedIps): void
     {
-        $settings            = $this->method_settings ?? [];
-        $settings[$method]   = [
-            'rate_limit'  => $rateLimit ?: null,
+        $settings = $this->method_settings ?? [];
+        $settings[$method] = [
+            'rate_limit' => $rateLimit ?: null,
             'allowed_ips' => $allowedIps,
         ];
         $this->update(['method_settings' => $settings]);

@@ -1,14 +1,18 @@
 <?php
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Attributes\ApiVersion;
+use YusufGenc34\FilamentApiForge\FilamentApiForgeServiceProvider;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Http\Middleware\SetApiForgeVersion;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\TestModel;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +31,7 @@ class TransformedResource
     {
         return [
             'allowed_methods' => ['index', 'show'],
-            'scope_map'       => ['show' => 'special:read'],
+            'scope_map' => ['show' => 'special:read'],
         ];
     }
 
@@ -43,7 +47,7 @@ class TransformedResource
 // ── API Versioning ─────────────────────────────────────────────────────────
 
 it('ApiVersion attribute restricts resource availability per version', function () {
-    $service = new ResourceDiscoveryService();
+    $service = new ResourceDiscoveryService;
 
     $versions = (new ReflectionMethod($service, 'resourceVersions'))
         ->invoke($service, V2OnlyResource::class);
@@ -61,7 +65,7 @@ it('ApiVersion attribute restricts resource availability per version', function 
 it('SetApiForgeVersion middleware sets the version request attribute', function () {
     $request = Request::create('/api/v2/admin/posts', 'GET');
 
-    (new SetApiForgeVersion())->handle($request, fn ($r) => response('ok'), 'v2');
+    (new SetApiForgeVersion)->handle($request, fn ($r) => response('ok'), 'v2');
 
     expect($request->attributes->get('api_forge_version'))->toBe('v2');
 });
@@ -70,10 +74,10 @@ it('multi-version mode registers prefixed route sets', function () {
     config()->set('filament-api-forge.versions', ['v1', 'v2']);
     config()->set('filament-api-forge.api_base', 'api');
 
-    $provider = new \YusufGenc34\FilamentApiForge\FilamentApiForgeServiceProvider(app());
+    $provider = new FilamentApiForgeServiceProvider(app());
     (new ReflectionMethod($provider, 'registerApiRoutes'))->invoke($provider);
 
-    $routes = collect(\Illuminate\Support\Facades\Route::getRoutes()->getRoutes());
+    $routes = collect(Route::getRoutes()->getRoutes());
 
     $v2Index = $routes->first(fn ($r) => $r->getName() === 'v2.api-forge.index');
 
@@ -92,9 +96,9 @@ it('scope_map overrides the default scope for a method', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => TransformedResource::class,
-        'model_class'    => TestModel::class,
-        'slug'           => 'transformed',
-        'api_config'     => TransformedResource::apiConfig(),
+        'model_class' => TestModel::class,
+        'slug' => 'transformed',
+        'api_config' => TransformedResource::apiConfig(),
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturn(true);
 
@@ -109,7 +113,7 @@ it('scope_map overrides the default scope for a method', function () {
 
     $denied = $resolve->invoke($controller, 'admin', 'transformed', 'show');
 
-    expect($denied)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class)
+    expect($denied)->toBeInstanceOf(JsonResponse::class)
         ->and($denied->getStatusCode())->toBe(403)
         ->and($denied->getData(true)['required_scope'])->toBe('special:read');
 
@@ -143,17 +147,17 @@ it('apiTransform reshapes serialized records', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => TransformedResource::class,
-        'model_class'    => TestModel::class,
-        'slug'           => 'transformed',
-        'plural_label'   => 'Transformed',
-        'api_config'     => ['allowed_methods' => ['show']],
+        'model_class' => TestModel::class,
+        'slug' => 'transformed',
+        'plural_label' => 'Transformed',
+        'api_config' => ['allowed_methods' => ['show']],
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturn(true);
     $mock->shouldReceive('getAllowedFields')->andReturn([]);
     $mock->shouldReceive('getAllowedIncludes')->andReturn([]);
 
     $controller = new ApiResourceController($mock);
-    $request = Request::create('/api/v1/admin/transformed/' . $record->id, 'GET');
+    $request = Request::create('/api/v1/admin/transformed/'.$record->id, 'GET');
     app()->instance('request', $request);
 
     $response = $controller->show($request, 'admin', 'transformed', (string) $record->id);
@@ -169,7 +173,7 @@ it('OpenAPI spec is version-aware in multi-version mode', function () {
     config()->set('filament-api-forge.versions', ['v1', 'v2']);
     config()->set('filament-api-forge.api_base', 'api');
 
-    $controller = app(\YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController::class);
+    $controller = app(ApiDocumentationController::class);
 
     $v1 = $controller->openApiSpec(Request::create('/docs/openapi.json'))->getData(true);
     $v2 = $controller->openApiSpec(Request::create('/docs/openapi.json?version=v2'))->getData(true);

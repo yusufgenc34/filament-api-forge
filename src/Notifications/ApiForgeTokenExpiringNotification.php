@@ -2,10 +2,10 @@
 
 namespace YusufGenc34\FilamentApiForge\Notifications;
 
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 
 class ApiForgeTokenExpiringNotification extends Notification
 {
@@ -24,7 +24,7 @@ class ApiForgeTokenExpiringNotification extends Notification
     {
         $expiresAt = $this->token->expires_at;
 
-        return (new MailMessage())
+        return (new MailMessage)
             ->subject("API token '{$this->token->name}' is expiring soon")
             ->line("Your API token '{$this->token->name}' ({$this->token->token_prefix}…) expires on {$expiresAt->toDayDateTimeString()}.")
             ->line('Rotate or renew it before then to avoid interrupted API access.')
@@ -34,11 +34,11 @@ class ApiForgeTokenExpiringNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'token_id'     => $this->token->id,
-            'token_name'   => $this->token->name,
+            'token_id' => $this->token->id,
+            'token_name' => $this->token->name,
             'token_prefix' => $this->token->token_prefix,
-            'expires_at'   => $this->token->expires_at?->toIso8601String(),
-            'message'      => "API token '{$this->token->name}' expires on {$this->token->expires_at?->toDayDateTimeString()}.",
+            'expires_at' => $this->token->expires_at?->toIso8601String(),
+            'message' => "API token '{$this->token->name}' expires on {$this->token->expires_at?->toDayDateTimeString()}.",
         ];
     }
 }

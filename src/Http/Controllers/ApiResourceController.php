@@ -2,32 +2,30 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
-use YusufGenc34\FilamentApiForge\Concerns\BuildsResourceQuery;
-use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
-use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
-use YusufGenc34\FilamentApiForge\Concerns\ResolvesApiResource;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleted;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleting;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceRestored;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceRestoring;
-use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
-use YusufGenc34\FilamentApiForge\Services\FileUploadService;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\QueryBuilder;
-use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\AllowedSort;
+use YusufGenc34\FilamentApiForge\Concerns\BuildsResourceQuery;
+use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
+use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
+use YusufGenc34\FilamentApiForge\Concerns\ResolvesApiResource;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceForceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestored;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceRestoring;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
+use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
+use YusufGenc34\FilamentApiForge\Services\FileUploadService;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class ApiResourceController extends Controller
 {
@@ -63,12 +61,7 @@ class ApiResourceController extends Controller
             ->paginate($perPage)
             ->appends($request->query());
 
-        return ApiForgeJsonResource::collection($results)->additional([
-            'meta' => [
-                'api_version' => config('filament-api-forge.api_version', 'v1'),
-                'resource'    => $resource['plural_label'],
-            ],
-        ]);
+        return $this->makeJsonResponse($resource, $results, true);
     }
 
     /**
@@ -76,7 +69,7 @@ class ApiResourceController extends Controller
      *
      * Show a single resource.
      */
-    public function show(Request $request, string $panelId, string $resourceSlug, string $recordId): ApiForgeJsonResource|JsonResponse
+    public function show(Request $request, string $panelId, string $resourceSlug, string $recordId): mixed
     {
         $resource = $this->resolveResource($panelId, $resourceSlug, 'show');
 
@@ -99,7 +92,12 @@ class ApiResourceController extends Controller
 
         $record = $query->findOrFail($recordId);
 
-        return new ApiForgeJsonResource($record);
+        $policyError = $this->checkPolicy($resource, 'show', $record);
+        if ($policyError) {
+            return $policyError;
+        }
+
+        return $this->makeJsonResponse($resource, $record);
     }
 
     /**
@@ -108,7 +106,7 @@ class ApiResourceController extends Controller
      * Create a new resource. Validation rules are dynamically
      * extracted from the Filament Resource's form schema.
      */
-    public function store(Request $request, string $panelId, string $resourceSlug): ApiForgeJsonResource|JsonResponse
+    public function store(Request $request, string $panelId, string $resourceSlug): mixed
     {
         $resource = $this->resolveResource($panelId, $resourceSlug, 'store');
 
@@ -138,10 +136,11 @@ class ApiResourceController extends Controller
             ApiResourceCreating::dispatch($resourceClass, $modelData);
         }
 
-        $record = new $modelClass();
+        $record = new $modelClass;
         $record->fill($modelData);
         $this->stampTenant($record, $resource);
         $record->save();
+        $this->syncRelationships($record, $apiConfig, $data);
 
         // Handle file uploads if configured
         $uploadResults = $this->processFileUploads($record, $apiConfig, $request);
@@ -153,14 +152,13 @@ class ApiResourceController extends Controller
 
         $this->executeAfterHooks($resourceClass, 'afterCreate', $record, $data);
 
-        $fresh = $record->fresh();
-        $resource = new ApiForgeJsonResource($fresh);
+        $responseObj = $this->makeJsonResponse($resource, $record->fresh());
 
-        if (! empty($uploadResults)) {
-            $resource->additional(['_uploads' => $uploadResults]);
+        if (! empty($uploadResults) && method_exists($responseObj, 'additional')) {
+            $responseObj->additional(['_uploads' => $uploadResults]);
         }
 
-        return $resource;
+        return $responseObj;
     }
 
     /**
@@ -182,6 +180,11 @@ class ApiResourceController extends Controller
 
         $record = $this->tenantScopedQuery($modelClass, $resource)->findOrFail($recordId);
 
+        $policyError = $this->checkPolicy($resource, 'update', $record);
+        if ($policyError) {
+            return $policyError;
+        }
+
         $rules = $this->extractValidationRules($resourceClass, true, $apiConfig);
         $rules = $this->mergeUploadRules($rules, $apiConfig);
 
@@ -202,6 +205,7 @@ class ApiResourceController extends Controller
 
         $record->fill($modelData);
         $record->save();
+        $this->syncRelationships($record, $apiConfig, $data);
 
         // Handle file uploads if configured
         $uploadResults = $this->processFileUploads($record, $apiConfig, $request);
@@ -213,13 +217,13 @@ class ApiResourceController extends Controller
 
         $this->executeAfterHooks($resourceClass, 'afterUpdate', $record, $data);
 
-        $resource = new ApiForgeJsonResource($record->fresh());
+        $responseObj = $this->makeJsonResponse($resource, $record->fresh());
 
-        if (! empty($uploadResults)) {
-            $resource->additional(['_uploads' => $uploadResults]);
+        if (! empty($uploadResults) && method_exists($responseObj, 'additional')) {
+            $responseObj->additional(['_uploads' => $uploadResults]);
         }
 
-        return $resource;
+        return $responseObj;
     }
 
     /**
@@ -238,6 +242,11 @@ class ApiResourceController extends Controller
         $modelClass = $resource['model_class'];
         $resourceClass = $resource['resource_class'];
         $record = $this->tenantScopedQuery($modelClass, $resource)->findOrFail($recordId);
+
+        $policyError = $this->checkPolicy($resource, 'destroy', $record);
+        if ($policyError) {
+            return $policyError;
+        }
 
         $eventsEnabled = $this->eventsEnabled();
 
@@ -268,7 +277,7 @@ class ApiResourceController extends Controller
      *
      * Restore a soft-deleted resource.
      */
-    public function restore(Request $request, string $panelId, string $resourceSlug, string $recordId): ApiForgeJsonResource|JsonResponse
+    public function restore(Request $request, string $panelId, string $resourceSlug, string $recordId): mixed
     {
         $resource = $this->resolveResource($panelId, $resourceSlug, 'restore');
 
@@ -282,11 +291,16 @@ class ApiResourceController extends Controller
         if (! $this->modelUsesSoftDeletes($modelClass)) {
             return response()->json([
                 'message' => 'This resource does not support soft deletes.',
-                'error'   => 'method_not_allowed',
+                'error' => 'method_not_allowed',
             ], 405);
         }
 
         $record = $this->tenantScopedQuery($modelClass, $resource)->onlyTrashed()->findOrFail($recordId);
+
+        $policyError = $this->checkPolicy($resource, 'restore', $record);
+        if ($policyError) {
+            return $policyError;
+        }
 
         $eventsEnabled = $this->eventsEnabled();
 
@@ -304,7 +318,27 @@ class ApiResourceController extends Controller
 
         $this->executeVoidHooks($resourceClass, 'afterRestore', $record);
 
-        return new ApiForgeJsonResource($record->fresh());
+        return $this->makeJsonResponse($resource, $record->fresh());
+    }
+
+    /**
+     * Build the JSON response object using custom api_resource or default ApiForgeJsonResource.
+     */
+    protected function makeJsonResponse(array $resource, mixed $data, bool $isCollection = false): mixed
+    {
+        $customResourceClass = $resource['api_config']['api_resource'] ?? null;
+        $jsonResourceClass = $customResourceClass ?? ApiForgeJsonResource::class;
+
+        if ($isCollection) {
+            return $jsonResourceClass::collection($data)->additional([
+                'meta' => [
+                    'api_version' => config('filament-api-forge.api_version', 'v1'),
+                    'resource' => $resource['plural_label'],
+                ],
+            ]);
+        }
+
+        return new $jsonResourceClass($data);
     }
 
     /**
@@ -326,11 +360,16 @@ class ApiResourceController extends Controller
         if (! $this->modelUsesSoftDeletes($modelClass)) {
             return response()->json([
                 'message' => 'This resource does not support soft deletes.',
-                'error'   => 'method_not_allowed',
+                'error' => 'method_not_allowed',
             ], 405);
         }
 
         $record = $this->tenantScopedQuery($modelClass, $resource)->withTrashed()->findOrFail($recordId);
+
+        $policyError = $this->checkPolicy($resource, 'forceDelete', $record);
+        if ($policyError) {
+            return $policyError;
+        }
 
         $eventsEnabled = $this->eventsEnabled();
 
@@ -403,5 +442,36 @@ class ApiResourceController extends Controller
         $uploadService = app(FileUploadService::class);
 
         return $uploadService->handleUploads($record, $uploads, $request);
+    }
+
+    /**
+     * Sync Eloquent relationships (BelongsToMany, MorphToMany) if present in payload.
+     */
+    protected function syncRelationships(mixed $record, array $apiConfig, array $data): void
+    {
+        $relationsConfig = $apiConfig['sync_relations'] ?? true;
+        if (! $relationsConfig) {
+            return;
+        }
+
+        foreach ($data as $key => $value) {
+            if (! is_array($value)) {
+                continue;
+            }
+
+            if (method_exists($record, $key)) {
+                try {
+                    $relation = $record->{$key}();
+
+                    if ($relation instanceof BelongsToMany
+                        || $relation instanceof MorphToMany
+                        || method_exists($relation, 'sync')) {
+                        $relation->sync($value);
+                    }
+                } catch (\Throwable) {
+                    // Ignore non-relationship methods or errors gracefully
+                }
+            }
+        }
     }
 }

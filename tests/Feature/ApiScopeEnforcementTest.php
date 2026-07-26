@@ -1,31 +1,32 @@
 <?php
 
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Foundation\Auth\User;
-use Illuminate\Http\Request;
 
 beforeEach(function () {
     $this->user = User::create([
-        'name'     => 'Scope User',
-        'email'    => 'scope@example.com',
+        'name' => 'Scope User',
+        'email' => 'scope@example.com',
         'password' => bcrypt('password'),
     ]);
 });
 
 function makeToken(User $user, array $scopes, ?array $allowedResources = null): ApiForgeToken
 {
-    $plain = 'forge_' . str_repeat(chr(97 + random_int(0, 25)), 40);
+    $plain = 'forge_'.str_repeat(chr(97 + random_int(0, 25)), 40);
 
     return ApiForgeToken::create([
-        'user_id'           => $user->id,
-        'name'              => 'Scope Test ' . implode(',', $scopes),
-        'token_hash'        => hash('sha256', $plain),
-        'token_prefix'      => substr($plain, 0, 16),
-        'scopes'            => $scopes,
+        'user_id' => $user->id,
+        'name' => 'Scope Test '.implode(',', $scopes),
+        'token_hash' => hash('sha256', $plain),
+        'token_prefix' => substr($plain, 0, 16),
+        'scopes' => $scopes,
         'allowed_resources' => $allowedResources,
-        'is_active'         => true,
+        'is_active' => true,
     ]);
 }
 
@@ -76,9 +77,9 @@ it('resolveResource returns 403 when token lacks required scope', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\PostResource',
-        'model_class'    => 'App\\Models\\Post',
-        'slug'           => 'posts',
-        'api_config'     => ['allowed_methods' => ['store']],
+        'model_class' => 'App\\Models\\Post',
+        'slug' => 'posts',
+        'api_config' => ['allowed_methods' => ['store']],
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturn(true);
 
@@ -87,7 +88,7 @@ it('resolveResource returns 403 when token lacks required scope', function () {
     $ref = new ReflectionMethod($controller, 'resolveResource');
     $result = $ref->invoke($controller, 'admin', 'posts', 'store');
 
-    expect($result)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($result)->toBeInstanceOf(JsonResponse::class);
 
     $data = $result->getData(true);
     expect($data['error'])->toBe('insufficient_scope');
@@ -106,9 +107,9 @@ it('resolveResource returns 403 when token is restricted to other resources', fu
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\PostResource',
-        'model_class'    => 'App\\Models\\Post',
-        'slug'           => 'posts',
-        'api_config'     => ['allowed_methods' => ['store']],
+        'model_class' => 'App\\Models\\Post',
+        'slug' => 'posts',
+        'api_config' => ['allowed_methods' => ['store']],
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturn(true);
 
@@ -117,7 +118,7 @@ it('resolveResource returns 403 when token is restricted to other resources', fu
     $ref = new ReflectionMethod($controller, 'resolveResource');
     $result = $ref->invoke($controller, 'admin', 'posts', 'store');
 
-    expect($result)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($result)->toBeInstanceOf(JsonResponse::class);
 
     $data = $result->getData(true);
     expect($data['error'])->toBe('resource_not_allowed');
@@ -134,9 +135,9 @@ it('resolveResource allows access when token has full permissions', function () 
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\PostResource',
-        'model_class'    => 'App\\Models\\Post',
-        'slug'           => 'posts',
-        'api_config'     => ['allowed_methods' => ['store']],
+        'model_class' => 'App\\Models\\Post',
+        'slug' => 'posts',
+        'api_config' => ['allowed_methods' => ['store']],
     ]);
     $mock->shouldReceive('isMethodAllowed')->andReturn(true);
 
@@ -156,13 +157,13 @@ it('controller scope map covers all CRUD methods', function () {
     $scopeMap = $ref->getConstant('SCOPE_MAP');
 
     expect($scopeMap)->toBe([
-        'index'       => 'read',
-        'show'        => 'read',
-        'export'      => 'read',
-        'store'       => 'write',
-        'update'      => 'write',
-        'restore'     => 'write',
-        'destroy'     => 'delete',
+        'index' => 'read',
+        'show' => 'read',
+        'export' => 'read',
+        'store' => 'write',
+        'update' => 'write',
+        'restore' => 'write',
+        'destroy' => 'delete',
         'forceDelete' => 'delete',
     ]);
 });

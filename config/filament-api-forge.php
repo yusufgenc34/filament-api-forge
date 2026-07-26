@@ -66,6 +66,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Policy Authorization
+    |--------------------------------------------------------------------------
+    |
+    | Automatically authorize API actions against Laravel Model Policies
+    | when enabled and a policy exists for the model.
+    |
+    */
+    'policies' => [
+        'enabled' => env('API_FORGE_USE_POLICIES', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Documentation
     |--------------------------------------------------------------------------
     |
@@ -191,9 +204,9 @@ return [
     |
     */
     'export' => [
-        'enabled'  => true,
+        'enabled' => true,
         'max_rows' => 10000,
-        'formats'  => ['csv', 'json'],
+        'formats' => ['csv', 'json'],
     ],
 
     /*
@@ -206,7 +219,7 @@ return [
     |
     */
     'audit' => [
-        'enabled'    => env('API_FORGE_AUDIT', true),
+        'enabled' => env('API_FORGE_AUDIT', true),
         'prune_days' => 30,
     ],
 
@@ -219,7 +232,7 @@ return [
     |
     */
     'notifications' => [
-        'channels'    => ['mail', 'database'],
+        'channels' => ['mail', 'database'],
         'expiry_days' => 7,
     ],
 
@@ -234,8 +247,8 @@ return [
     */
     'cache' => [
         'enabled' => env('API_FORGE_CACHE', false),
-        'ttl'     => 60,   // seconds
-        'store'   => null, // null = default cache store
+        'ttl' => 60,   // seconds
+        'store' => null, // null = default cache store
     ],
 
     /*

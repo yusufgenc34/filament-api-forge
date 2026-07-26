@@ -1,19 +1,21 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\RateLimiter;
 use YusufGenc34\FilamentApiForge\Http\Middleware\EnforceApiForgeRules;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\TestModel;
-use Illuminate\Http\Request;
 
 function auditMiddleware(): EnforceApiForgeRules
 {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\AuditResource',
-        'model_class'    => TestModel::class,
-        'slug'           => 'audits',
-        'api_config'     => [],
+        'model_class' => TestModel::class,
+        'slug' => 'audits',
+        'api_config' => [],
     ]);
 
     return new EnforceApiForgeRules($mock);
@@ -23,7 +25,7 @@ function runAuditRequest(string $uri = '/api/v1/admin/audits', string $method = 
 {
     $request = Request::create($uri, $method);
     $request->setRouteResolver(function () use ($request) {
-        $route = new \Illuminate\Routing\Route(['GET'], '{panelId}/{resourceSlug}', []);
+        $route = new Route(['GET'], '{panelId}/{resourceSlug}', []);
         $route->bind($request);
         $route->setParameter('panelId', 'admin');
         $route->setParameter('resourceSlug', 'audits');
@@ -36,7 +38,7 @@ function runAuditRequest(string $uri = '/api/v1/admin/audits', string $method = 
 
 beforeEach(function () {
     ApiForgeRequestLog::query()->delete();
-    \Illuminate\Support\Facades\RateLimiter::clear('api-forge-dynamic|App\\Filament\\Resources\\AuditResource|index|127.0.0.1');
+    RateLimiter::clear('api-forge-dynamic|App\\Filament\\Resources\\AuditResource|index|127.0.0.1');
 });
 
 it('records an audit log entry for each request', function () {

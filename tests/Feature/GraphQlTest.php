@@ -1,19 +1,21 @@
 <?php
 
+use GraphQL\Error\DebugFlag;
 use GraphQL\GraphQL;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Http\Controllers\GraphQlController;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\GraphQlSchemaService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 // ── Stubs ──────────────────────────────────────────────────────────────────
 
 class GraphQlPostModel extends Model
 {
     protected $table = 'graphql_posts';
+
     protected $fillable = ['title', 'status'];
 }
 
@@ -22,9 +24,9 @@ class GraphQlPostResource
     public static function apiConfig(): array
     {
         return [
-            'allowed_methods'  => ['index', 'show', 'store', 'update', 'destroy'],
-            'allowed_filters'  => ['status'],
-            'searchable'       => ['title'],
+            'allowed_methods' => ['index', 'show', 'store', 'update', 'destroy'],
+            'allowed_filters' => ['status'],
+            'searchable' => ['title'],
             'validation_rules' => ['title' => ['required', 'string'], 'status' => ['sometimes', 'string']],
         ];
     }
@@ -36,12 +38,12 @@ function graphQlService(): GraphQlSchemaService
     $mock->shouldReceive('discoverForVersion')->andReturn(collect([
         [
             'resource_class' => GraphQlPostResource::class,
-            'model_class'    => GraphQlPostModel::class,
-            'slug'           => 'graphql-posts',
-            'panel_id'       => 'admin',
-            'plural_label'   => 'GraphQL Posts',
-            'api_config'     => GraphQlPostResource::apiConfig(),
-            'versions'       => null,
+            'model_class' => GraphQlPostModel::class,
+            'slug' => 'graphql-posts',
+            'panel_id' => 'admin',
+            'plural_label' => 'GraphQL Posts',
+            'api_config' => GraphQlPostResource::apiConfig(),
+            'versions' => null,
         ],
     ]));
 
@@ -52,7 +54,7 @@ function runGraphQl(string $query, ?array $variables = null): array
 {
     $result = GraphQL::executeQuery(graphQlService()->schema(), $query, null, null, $variables);
 
-    return $result->toArray(\GraphQL\Error\DebugFlag::INCLUDE_DEBUG_MESSAGE);
+    return $result->toArray(DebugFlag::INCLUDE_DEBUG_MESSAGE);
 }
 
 beforeEach(function () {
@@ -132,7 +134,7 @@ it('enforces token scopes when auth is enabled', function () {
     $request->attributes->set('api_forge_token', new ApiForgeToken(['scopes' => ['read']]));
     app()->instance('request', $request);
 
-    $read  = runGraphQl('{ graphqlPosts { total } }');
+    $read = runGraphQl('{ graphqlPosts { total } }');
     $write = runGraphQl('mutation { createGraphqlPost(title: "Nope") { id } }');
 
     expect($read)->not->toHaveKey('errors')

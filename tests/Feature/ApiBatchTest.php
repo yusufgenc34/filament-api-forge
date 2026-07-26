@@ -1,11 +1,11 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiBatchController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\BatchTestModel;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 function makeJsonRequest(string $uri, array $body): Request
 {
@@ -13,6 +13,7 @@ function makeJsonRequest(string $uri, array $body): Request
         'CONTENT_TYPE' => 'application/json',
     ], json_encode($body));
     $request->headers->set('Accept', 'application/json');
+
     return $request;
 }
 
@@ -30,9 +31,9 @@ it('batch controller creates records in transaction', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\BatchResource',
-        'model_class'    => BatchTestModel::class,
-        'slug'           => 'batch-test',
-        'api_config'     => ['batch' => ['max_size' => 50]],
+        'model_class' => BatchTestModel::class,
+        'slug' => 'batch-test',
+        'api_config' => ['batch' => ['max_size' => 50]],
     ]);
 
     $controller = new ApiBatchController($mock);
@@ -59,9 +60,9 @@ it('batch controller updates records', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\BatchResource',
-        'model_class'    => BatchTestModel::class,
-        'slug'           => 'batch-test',
-        'api_config'     => ['batch' => ['max_size' => 50]],
+        'model_class' => BatchTestModel::class,
+        'slug' => 'batch-test',
+        'api_config' => ['batch' => ['max_size' => 50]],
     ]);
 
     $controller = new ApiBatchController($mock);
@@ -91,9 +92,9 @@ it('batch controller deletes records', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\BatchResource',
-        'model_class'    => BatchTestModel::class,
-        'slug'           => 'batch-test',
-        'api_config'     => ['batch' => ['max_size' => 50]],
+        'model_class' => BatchTestModel::class,
+        'slug' => 'batch-test',
+        'api_config' => ['batch' => ['max_size' => 50]],
     ]);
 
     $controller = new ApiBatchController($mock);
@@ -115,9 +116,9 @@ it('batch controller respects max size limit', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\BatchResource',
-        'model_class'    => BatchTestModel::class,
-        'slug'           => 'batch-test',
-        'api_config'     => ['batch' => ['max_size' => 2]],
+        'model_class' => BatchTestModel::class,
+        'slug' => 'batch-test',
+        'api_config' => ['batch' => ['max_size' => 2]],
     ]);
 
     $controller = new ApiBatchController($mock);
@@ -130,7 +131,7 @@ it('batch controller respects max size limit', function () {
     try {
         $controller->batch($request, 'admin', 'batch-test');
         $this->fail('Expected validation exception was not thrown');
-    } catch (\Illuminate\Validation\ValidationException $e) {
+    } catch (ValidationException $e) {
         expect($e->status)->toBe(422);
         expect($e->errors())->toHaveKey('create');
     }

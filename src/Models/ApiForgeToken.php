@@ -9,19 +9,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * @property string      $id
- * @property int         $user_id
- * @property string      $name
- * @property string      $token_hash     SHA-256 of the plain-text token (never exposed)
- * @property string      $token_prefix   First 16 chars of the plain-text token (for display)
- * @property array       $scopes
- * @property array|null  $allowed_resources
+ * @property string $id
+ * @property int $user_id
+ * @property string $name
+ * @property string $token_hash SHA-256 of the plain-text token (never exposed)
+ * @property string $token_prefix First 16 chars of the plain-text token (for display)
+ * @property array $scopes
+ * @property array|null $allowed_resources
  * @property Carbon|null $expires_at
  * @property Carbon|null $last_used_at
- * @property int         $request_count
- * @property bool        $is_active
- * @property Carbon      $created_at
- * @property Carbon      $updated_at
+ * @property int $request_count
+ * @property bool $is_active
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class ApiForgeToken extends Model
 {
@@ -47,13 +47,13 @@ class ApiForgeToken extends Model
     ];
 
     protected $casts = [
-        'scopes'             => 'array',
-        'allowed_resources'  => 'array',
-        'expires_at'         => 'datetime',
-        'last_used_at'       => 'datetime',
+        'scopes' => 'array',
+        'allowed_resources' => 'array',
+        'expires_at' => 'datetime',
+        'last_used_at' => 'datetime',
         'expiry_notified_at' => 'datetime',
-        'is_active'          => 'boolean',
-        'request_count'      => 'integer',
+        'is_active' => 'boolean',
+        'request_count' => 'integer',
     ];
 
     protected $hidden = [
@@ -90,6 +90,7 @@ class ApiForgeToken extends Model
     public function hasScope(string $scope): bool
     {
         $scopes = $this->scopes ?? [];
+
         return in_array('*', $scopes) || in_array($scope, $scopes);
     }
 

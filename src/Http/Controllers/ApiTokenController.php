@@ -2,10 +2,10 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
-use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 
 class ApiTokenController extends Controller
 {
@@ -26,15 +26,15 @@ class ApiTokenController extends Controller
         if (! $token) {
             return response()->json([
                 'message' => 'Unauthenticated.',
-                'error'   => 'unauthenticated',
+                'error' => 'unauthenticated',
             ], 401);
         }
 
         $result = $this->tokenService->rotate($token);
 
         return response()->json([
-            'message'    => 'Token rotated successfully. Store the new token now — it will not be shown again.',
-            'token'      => $result['plain_text_token'],
+            'message' => 'Token rotated successfully. Store the new token now — it will not be shown again.',
+            'token' => $result['plain_text_token'],
             'expires_at' => $result['record']->expires_at?->toIso8601String(),
         ]);
     }
@@ -55,15 +55,15 @@ class ApiTokenController extends Controller
         if (! $result) {
             return response()->json([
                 'message' => 'Invalid refresh token.',
-                'error'   => 'invalid_refresh_token',
+                'error' => 'invalid_refresh_token',
             ], 401);
         }
 
         return response()->json([
-            'message'       => 'Token refreshed successfully. Store the new tokens now — they will not be shown again.',
-            'token'         => $result['plain_text_token'],
+            'message' => 'Token refreshed successfully. Store the new tokens now — they will not be shown again.',
+            'token' => $result['plain_text_token'],
             'refresh_token' => $result['plain_refresh_token'],
-            'expires_at'    => $result['record']->expires_at?->toIso8601String(),
+            'expires_at' => $result['record']->expires_at?->toIso8601String(),
         ]);
     }
 }

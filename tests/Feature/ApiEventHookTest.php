@@ -1,14 +1,14 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
-use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
+use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
+use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
 
 // ── Stub with hooks ────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ class HookedResource
     {
         static::$calls[] = 'beforeCreate';
         $data['hooked'] = true;
+
         return $data;
     }
 
@@ -34,6 +35,7 @@ class HookedResource
     {
         static::$calls[] = 'beforeUpdate';
         $data['updated_hook'] = true;
+
         return $data;
     }
 
@@ -139,18 +141,19 @@ it('afterDelete hook is called', function () {
 });
 
 it('default trait hooks are no-ops', function () {
-    $class = new class {
+    $class = new class
+    {
         use ApiForgeHooks;
     };
 
     $model = Mockery::mock(Model::class);
 
     expect($class::beforeCreate([]))->toBe([]);
-    expect(fn () => $class::afterCreate($model, []))->not->toThrow(\Exception::class);
+    expect(fn () => $class::afterCreate($model, []))->not->toThrow(Exception::class);
     expect($class::beforeUpdate($model, []))->toBe([]);
-    expect(fn () => $class::afterUpdate($model, []))->not->toThrow(\Exception::class);
-    expect(fn () => $class::beforeDelete($model))->not->toThrow(\Exception::class);
-    expect(fn () => $class::afterDelete($model))->not->toThrow(\Exception::class);
+    expect(fn () => $class::afterUpdate($model, []))->not->toThrow(Exception::class);
+    expect(fn () => $class::beforeDelete($model))->not->toThrow(Exception::class);
+    expect(fn () => $class::afterDelete($model))->not->toThrow(Exception::class);
 });
 
 // ── Feature: Event Dispatching ─────────────────────────────────────────────

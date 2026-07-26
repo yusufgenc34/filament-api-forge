@@ -3,9 +3,9 @@
 namespace YusufGenc34\FilamentApiForge\Http\Middleware;
 
 use Closure;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 
 class ApiForgeAuthenticate
 {
@@ -16,7 +16,7 @@ class ApiForgeAuthenticate
         if (! $plain || ! str_starts_with($plain, 'forge_')) {
             return response()->json([
                 'message' => 'Unauthenticated. Provide a valid API Forge token via Bearer authentication.',
-                'error'   => 'unauthenticated',
+                'error' => 'unauthenticated',
             ], 401);
         }
 
@@ -25,7 +25,7 @@ class ApiForgeAuthenticate
         if (! $apiForgeToken) {
             return response()->json([
                 'message' => 'Invalid API token.',
-                'error'   => 'invalid_token',
+                'error' => 'invalid_token',
             ], 401);
         }
 
@@ -36,7 +36,7 @@ class ApiForgeAuthenticate
 
             return response()->json([
                 'message' => $reason,
-                'error'   => 'token_invalid',
+                'error' => 'token_invalid',
             ], 403);
         }
 
@@ -45,7 +45,7 @@ class ApiForgeAuthenticate
         if (! $user) {
             return response()->json([
                 'message' => 'Token owner not found.',
-                'error'   => 'invalid_token',
+                'error' => 'invalid_token',
             ], 401);
         }
 

@@ -17,6 +17,7 @@ trait ApiForgeHooks
     {
         $result = static::$withoutHooksForNextCall;
         static::$withoutHooksForNextCall = false;
+
         return $result;
     }
 

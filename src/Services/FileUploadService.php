@@ -6,16 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 class FileUploadService
 {
     public function isSpatieMediaLibraryAvailable(): bool
     {
-        return class_exists(\Spatie\MediaLibrary\HasMedia::class);
+        return class_exists(HasMedia::class);
     }
 
     /**
-     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}> $uploadConfig
+     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}>  $uploadConfig
      * @return array<string, array{uuids?: string[], urls: string[]}>
      */
     public function handleUploads(Model $record, array $uploadConfig, Request $request): array
@@ -35,7 +37,7 @@ class FileUploadService
                 $files = [reset($files)];
             }
 
-            $urls  = [];
+            $urls = [];
             $uuids = [];
 
             foreach ($files as $file) {
@@ -44,17 +46,17 @@ class FileUploadService
                 }
 
                 if ($this->isSpatieMediaLibraryAvailable() &&
-                    in_array(\Spatie\MediaLibrary\InteractsWithMedia::class, class_uses($record))
+                    in_array(InteractsWithMedia::class, class_uses($record))
                 ) {
                     $collection = $config['collection'] ?? $field;
                     $media = $record->addMedia($file)->toMediaCollection($collection);
                     $uuids[] = $media->uuid;
-                    $urls[]  = $media->getUrl();
+                    $urls[] = $media->getUrl();
                 } else {
-                    $disk      = $config['disk'] ?? config('filament-api-forge.uploads.default_disk', 'public');
+                    $disk = $config['disk'] ?? config('filament-api-forge.uploads.default_disk', 'public');
                     $directory = $config['directory'] ?? $field;
-                    $path      = $file->store($directory, $disk);
-                    $urls[]    = Storage::disk($disk)->url($path);
+                    $path = $file->store($directory, $disk);
+                    $urls[] = Storage::disk($disk)->url($path);
 
                     // Persist the file path on the model so Filament can display it
                     if (! $isMultiple && $record->getConnection()->getSchemaBuilder()->hasColumn($record->getTable(), $field)) {
@@ -77,7 +79,7 @@ class FileUploadService
     }
 
     /**
-     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}> $uploadConfig
+     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}>  $uploadConfig
      */
     public function getValidationRules(array $uploadConfig): array
     {
@@ -92,7 +94,7 @@ class FileUploadService
             }
 
             if ($isMultiple) {
-                $rules["{$field}"]   = ['array'];
+                $rules["{$field}"] = ['array'];
                 $rules["{$field}.*"] = array_merge(['file'], $fieldRules);
             } else {
                 $rules[$field] = array_merge(['file'], $fieldRules);
@@ -103,14 +105,14 @@ class FileUploadService
     }
 
     /**
-     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}> $uploadConfig
+     * @param  array<string, array{disk?: string, rules?: string|array, multiple?: bool, collection?: string}>  $uploadConfig
      */
     public function getFileUrls(Model $record, array $uploadConfig): array
     {
         $urls = [];
 
         if ($this->isSpatieMediaLibraryAvailable() &&
-            in_array(\Spatie\MediaLibrary\InteractsWithMedia::class, class_uses($record))
+            in_array(InteractsWithMedia::class, class_uses($record))
         ) {
             foreach ($uploadConfig as $field => $config) {
                 $collection = $config['collection'] ?? $field;

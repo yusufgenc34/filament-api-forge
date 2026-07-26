@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 class ResponseCacheManager
 {
     protected const VERSION_PREFIX = 'api-forge:cache-ver:';
+
     protected const RESPONSE_PREFIX = 'api-forge:response:';
 
     public static function enabled(): bool
@@ -34,7 +35,7 @@ class ResponseCacheManager
 
     public static function version(string $resourceClass): int
     {
-        return (int) static::store()->get(self::VERSION_PREFIX . $resourceClass, 1);
+        return (int) static::store()->get(self::VERSION_PREFIX.$resourceClass, 1);
     }
 
     public static function bump(string $resourceClass): void
@@ -43,7 +44,7 @@ class ResponseCacheManager
             return;
         }
 
-        $key = self::VERSION_PREFIX . $resourceClass;
+        $key = self::VERSION_PREFIX.$resourceClass;
         $store = static::store();
 
         $store->put($key, (int) $store->get($key, 1) + 1);
@@ -51,7 +52,7 @@ class ResponseCacheManager
 
     public static function key(string $resourceClass, string $url, ?string $tokenId): string
     {
-        return self::RESPONSE_PREFIX . sha1(implode('|', [
+        return self::RESPONSE_PREFIX.sha1(implode('|', [
             $resourceClass,
             static::version($resourceClass),
             $url,

@@ -3,8 +3,8 @@
 namespace YusufGenc34\FilamentApiForge\Http\Middleware;
 
 use Closure;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\Request;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class CheckResourceEnabled
 {
@@ -15,7 +15,7 @@ class CheckResourceEnabled
     public function handle(Request $request, Closure $next): mixed
     {
         $panelId = $request->route('panelId');
-        $slug    = $request->route('resourceSlug');
+        $slug = $request->route('resourceSlug');
 
         if (! $panelId || ! $slug) {
             return $next($request);
@@ -27,7 +27,7 @@ class CheckResourceEnabled
         if ($resource === null) {
             return response()->json([
                 'message' => 'Resource not found or not exposed via API Forge.',
-                'error'   => 'not_found',
+                'error' => 'not_found',
             ], 404);
         }
 

@@ -2,27 +2,34 @@
 
 namespace YusufGenc34\FilamentApiForge\Pages;
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
-use YusufGenc34\FilamentApiForge\Contracts\HasApi;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
+use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
+use YusufGenc34\FilamentApiForge\Attributes\ApiVersion;
+use YusufGenc34\FilamentApiForge\Contracts\HasApi;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class AccessControl extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shield-check';
-    protected static string | \UnitEnum | null $navigationGroup = 'Developer Center';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Developer Center';
+
     protected static ?string $navigationLabel = 'Access Control';
+
     protected static ?string $title = 'Access Control';
+
     protected static ?int $navigationSort = 3;
+
     protected static ?string $slug = 'developer/access-control';
+
     protected string $view = 'filament-api-forge::access-control';
 
     public array $resourceStates = [];
 
-    public function getMaxContentWidth(): Width | string | null
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Full;
     }
@@ -88,9 +95,9 @@ class AccessControl extends Page
                     continue;
                 }
 
-                $setting    = $settings->get($resourceClass);
-                $tag        = $this->resolveResourceTag($resourceClass);
-                $apiConfig  = $resourceClass::apiConfig();
+                $setting = $settings->get($resourceClass);
+                $tag = $this->resolveResourceTag($resourceClass);
+                $apiConfig = $resourceClass::apiConfig();
                 $allMethods = $apiConfig['allowed_methods'] ?? ['index', 'show', 'store', 'update', 'destroy'];
 
                 $disabledMethods = $setting ? ($setting->disabled_methods ?? []) : [];
@@ -99,22 +106,22 @@ class AccessControl extends Page
                 foreach ($allMethods as $m) {
                     $mc = $setting ? $setting->getMethodConfig($m) : [];
                     $methodSettings[$m] = [
-                        'rate_limit'  => $mc['rate_limit'] ?? null,
+                        'rate_limit' => $mc['rate_limit'] ?? null,
                         'allowed_ips' => $mc['allowed_ips'] ?? [],
                     ];
                 }
 
                 $this->resourceStates[$resourceClass] = [
-                    'enabled'          => $setting ? $setting->enabled : true,
-                    'tag'              => $tag,
-                    'allowed_methods'  => $allMethods,
+                    'enabled' => $setting ? $setting->enabled : true,
+                    'tag' => $tag,
+                    'allowed_methods' => $allMethods,
                     'disabled_methods' => $disabledMethods,
-                    'rate_limit'       => $setting?->rate_limit,
-                    'allowed_ips'      => $setting?->allowed_ips ?? [],
-                    'method_settings'  => $methodSettings,
-                    'model_fields'     => $this->resolveModelFields($resourceClass),
-                    'api_config'       => $apiConfig,
-                    'versions'         => $this->resolveResourceVersions($resourceClass),
+                    'rate_limit' => $setting?->rate_limit,
+                    'allowed_ips' => $setting?->allowed_ips ?? [],
+                    'method_settings' => $methodSettings,
+                    'model_fields' => $this->resolveModelFields($resourceClass),
+                    'api_config' => $apiConfig,
+                    'versions' => $this->resolveResourceVersions($resourceClass),
                 ];
             }
         }
@@ -126,8 +133,8 @@ class AccessControl extends Page
     private function resolveResourceVersions(string $resourceClass): ?array
     {
         try {
-            $ref   = new \ReflectionClass($resourceClass);
-            $attrs = $ref->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiVersion::class);
+            $ref = new \ReflectionClass($resourceClass);
+            $attrs = $ref->getAttributes(ApiVersion::class);
 
             return $attrs ? $attrs[0]->newInstance()->versions : null;
         } catch (\Throwable) {
@@ -137,7 +144,7 @@ class AccessControl extends Page
 
     private function resolveResourceTag(string $resourceClass): string
     {
-        $ref   = new \ReflectionClass($resourceClass);
+        $ref = new \ReflectionClass($resourceClass);
         $attrs = $ref->getAttributes(ApiTag::class);
 
         if (! empty($attrs)) {
@@ -151,7 +158,8 @@ class AccessControl extends Page
     {
         try {
             $modelClass = $resourceClass::getModel();
-            $model      = new $modelClass();
+            $model = new $modelClass;
+
             return $model->getFillable();
         } catch (\Throwable) {
             return [];

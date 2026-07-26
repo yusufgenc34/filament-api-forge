@@ -1,13 +1,14 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
 use YusufGenc34\FilamentApiForge\Attributes\ApiDescription;
-use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
 use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
-use YusufGenc34\FilamentApiForge\Tests\Stubs\TaggedStub;
+use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
+use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\DescribedStub;
-use YusufGenc34\FilamentApiForge\Tests\Stubs\OperationsStub;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\IgnoredStub;
+use YusufGenc34\FilamentApiForge\Tests\Stubs\OperationsStub;
+use YusufGenc34\FilamentApiForge\Tests\Stubs\TaggedStub;
 
 it('ApiTag attribute can be read from a class', function () {
     $ref = new ReflectionClass(TaggedStub::class);
@@ -57,7 +58,7 @@ it('OpenAPI spec endpoint is publicly accessible', function () {
 });
 
 it('public docs endpoint is accessible when published', function () {
-    \YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting::set('docs_public', true);
+    ApiForgeGlobalSetting::set('docs_public', true);
 
     $response = $this->get('/api/v1/docs');
 
@@ -65,7 +66,7 @@ it('public docs endpoint is accessible when published', function () {
 });
 
 it('public docs returns 403 when not published', function () {
-    \YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting::set('docs_public', false);
+    ApiForgeGlobalSetting::set('docs_public', false);
 
     $response = $this->getJson('/api/v1/docs');
 

@@ -1,9 +1,9 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
 use YusufGenc34\FilamentApiForge\Attributes\ApiDescription;
-use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
 use YusufGenc34\FilamentApiForge\Attributes\ApiIgnore;
+use YusufGenc34\FilamentApiForge\Attributes\ApiOperations;
+use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
 
 it('creates ApiTag with name only', function () {
     $tag = new ApiTag('Posts');
@@ -26,17 +26,17 @@ it('creates ApiDescription', function () {
 });
 
 it('creates ApiIgnore attribute', function () {
-    $ignore = new ApiIgnore();
+    $ignore = new ApiIgnore;
 
     expect($ignore)->toBeInstanceOf(ApiIgnore::class);
 });
 
 it('resolves ApiOperations simple string summaries', function () {
     $ops = new ApiOperations(
-        index:   'List all posts',
-        show:    'Get a single post',
-        store:   'Create a post',
-        update:  'Update a post',
+        index: 'List all posts',
+        show: 'Get a single post',
+        store: 'Create a post',
+        update: 'Update a post',
     );
 
     expect($ops->getSummary('index'))->toBe('List all posts')
@@ -62,7 +62,7 @@ it('resolves ApiOperations array with summary and description', function () {
 });
 
 it('returns null for invalid operation names', function () {
-    $ops = new ApiOperations();
+    $ops = new ApiOperations;
 
     expect($ops->getSummary('nonexistent'))->toBeNull()
         ->and($ops->getDescription('nonexistent'))->toBeNull();

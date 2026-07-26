@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
@@ -10,9 +13,6 @@ use YusufGenc34\FilamentApiForge\Http\Controllers\ApiBatchController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\BatchTestModel;
 use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Schema;
 
 // ── Stub resource with hooks + validation rules ────────────────────────────
 
@@ -26,8 +26,8 @@ class BatchHookedResource
     {
         return [
             'validation_rules' => [
-                'title'    => ['required', 'string'],
-                'status'   => ['sometimes', 'string'],
+                'title' => ['required', 'string'],
+                'status' => ['sometimes', 'string'],
                 'priority' => ['sometimes', 'integer'],
             ],
         ];
@@ -84,9 +84,9 @@ function makeBatchController(): ApiBatchController
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => BatchHookedResource::class,
-        'model_class'    => BatchTestModel::class,
-        'slug'           => 'batch-test',
-        'api_config'     => BatchHookedResource::apiConfig(),
+        'model_class' => BatchTestModel::class,
+        'slug' => 'batch-test',
+        'api_config' => BatchHookedResource::apiConfig(),
     ]);
 
     return new ApiBatchController($mock);

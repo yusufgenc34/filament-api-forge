@@ -2,14 +2,14 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
-use YusufGenc34\FilamentApiForge\Events\ApiActionExecuting;
-use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use ReflectionMethod;
+use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
+use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
+use YusufGenc34\FilamentApiForge\Events\ApiActionExecuting;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class ApiActionController extends Controller
 {
@@ -27,7 +27,7 @@ class ApiActionController extends Controller
         if (! $resource) {
             return response()->json([
                 'message' => 'Resource not found.',
-                'error'   => 'not_found',
+                'error' => 'not_found',
             ], 404);
         }
 
@@ -38,7 +38,7 @@ class ApiActionController extends Controller
         if (! $record) {
             return response()->json([
                 'message' => 'Record not found.',
-                'error'   => 'not_found',
+                'error' => 'not_found',
             ], 404);
         }
 
@@ -56,7 +56,7 @@ class ApiActionController extends Controller
         if (! $resource) {
             return response()->json([
                 'message' => 'Resource not found.',
-                'error'   => 'not_found',
+                'error' => 'not_found',
             ], 404);
         }
 
@@ -73,7 +73,7 @@ class ApiActionController extends Controller
         if (! $actionMethod || ! $apiAction || $apiAction->record !== $expectsRecord) {
             return response()->json([
                 'message' => "Action '{$actionName}' is not defined on this resource.",
-                'error'   => 'action_not_found',
+                'error' => 'action_not_found',
             ], 404);
         }
 
@@ -81,7 +81,7 @@ class ApiActionController extends Controller
         if (strtoupper($request->method()) !== strtoupper($apiAction->method)) {
             return response()->json([
                 'message' => "Action '{$actionName}' requires HTTP {$apiAction->method}.",
-                'error'   => 'method_not_allowed',
+                'error' => 'method_not_allowed',
             ], 405);
         }
 
@@ -91,7 +91,7 @@ class ApiActionController extends Controller
         if ($token && ! $token->hasScope($apiAction->scope)) {
             return response()->json([
                 'message' => "This token does not have the required '{$apiAction->scope}' scope for action '{$actionName}'.",
-                'error'   => 'insufficient_scope',
+                'error' => 'insufficient_scope',
                 'required_scope' => $apiAction->scope,
             ], 403);
         }
@@ -117,8 +117,8 @@ class ApiActionController extends Controller
 
         return response()->json([
             'message' => "Action '{$actionName}' executed successfully.",
-            'action'  => $actionName,
-            'result'  => $result,
+            'action' => $actionName,
+            'result' => $result,
         ]);
     }
 

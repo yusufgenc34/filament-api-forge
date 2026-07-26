@@ -1,10 +1,13 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Services\FileUploadService;
-use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
+use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
+use YusufGenc34\FilamentApiForge\Services\FileUploadService;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 beforeEach(function () {
     Storage::fake('public');
@@ -21,14 +24,14 @@ beforeEach(function () {
 });
 
 it('FileUploadService detects Spatie Media Library availability', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
     // In test env without Spatie, it should return false
     expect($service->isSpatieMediaLibraryAvailable())->toBeFalse();
 });
 
 it('FileUploadService generates validation rules for single file', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
     $config = [
         'avatar' => ['rules' => 'image|max:2048'],
@@ -41,7 +44,7 @@ it('FileUploadService generates validation rules for single file', function () {
 });
 
 it('FileUploadService generates validation rules for multiple files', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
     $config = [
         'gallery' => ['multiple' => true, 'rules' => 'image|max:5120'],
@@ -55,19 +58,21 @@ it('FileUploadService generates validation rules for multiple files', function (
 });
 
 it('FileUploadService handles upload with Laravel filesystem fallback', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
     $file = UploadedFile::fake()->image('avatar.jpg');
 
-    $record = new class extends Model {
+    $record = new class extends Model
+    {
         protected $table = 'test_uploads';
+
         protected $fillable = ['title', 'avatar'];
     };
 
     $record->fill(['title' => 'Test']);
     $record->save();
 
-    $request = \Illuminate\Http\Request::create('/', 'POST', [], [], [
+    $request = Request::create('/', 'POST', [], [], [
         'avatar' => $file,
     ]);
 
@@ -77,24 +82,26 @@ it('FileUploadService handles upload with Laravel filesystem fallback', function
     expect($results)->toHaveKey('avatar')
         ->and($results['avatar'])->toHaveKey('url');
 
-    Storage::disk('public')->assertExists('avatar/' . $file->hashName());
+    Storage::disk('public')->assertExists('avatar/'.$file->hashName());
 });
 
 it('FileUploadService handles multiple file uploads', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
     $file1 = UploadedFile::fake()->image('photo1.jpg');
     $file2 = UploadedFile::fake()->image('photo2.jpg');
 
-    $record = new class extends Model {
+    $record = new class extends Model
+    {
         protected $table = 'test_uploads';
+
         protected $fillable = ['title', 'avatar', 'gallery'];
     };
 
     $record->fill(['title' => 'Gallery Test']);
     $record->save();
 
-    $request = \Illuminate\Http\Request::create('/', 'POST', [], [], [
+    $request = Request::create('/', 'POST', [], [], [
         'gallery' => [$file1, $file2],
     ]);
 
@@ -107,17 +114,19 @@ it('FileUploadService handles multiple file uploads', function () {
 });
 
 it('FileUploadService returns empty results when no files in request', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
-    $record = new class extends Model {
+    $record = new class extends Model
+    {
         protected $table = 'test_uploads';
+
         protected $fillable = ['title', 'avatar'];
     };
 
     $record->fill(['title' => 'No Files']);
     $record->save();
 
-    $request = \Illuminate\Http\Request::create('/', 'POST');
+    $request = Request::create('/', 'POST');
 
     $config = ['avatar' => ['disk' => 'public']];
     $results = $service->handleUploads($record, $config, $request);
@@ -126,10 +135,12 @@ it('FileUploadService returns empty results when no files in request', function 
 });
 
 it('FileUploadService returns empty getFileUrls without Spatie', function () {
-    $service = new FileUploadService();
+    $service = new FileUploadService;
 
-    $record = new class extends Model {
+    $record = new class extends Model
+    {
         protected $table = 'test_uploads';
+
         protected $fillable = ['title', 'avatar'];
     };
 
@@ -139,8 +150,10 @@ it('FileUploadService returns empty getFileUrls without Spatie', function () {
 });
 
 it('ApiForgeJsonResource includes _uploads at response root via additional', function () {
-    $record = new class extends Model {
+    $record = new class extends Model
+    {
         protected $table = 'test_uploads';
+
         protected $fillable = ['title', 'avatar'];
     };
 
@@ -159,8 +172,8 @@ it('ApiForgeJsonResource includes _uploads at response root via additional', fun
 });
 
 it('mergeUploadRules overrides generic model rules with file-specific rules', function () {
-    $controller = new \YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+    $controller = new ApiResourceController(
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     $ref = new ReflectionMethod($controller, 'mergeUploadRules');

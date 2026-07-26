@@ -1,15 +1,17 @@
 <?php
 
+use Illuminate\Foundation\Auth\User;
+use Illuminate\Http\Request;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Notification;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiTokenController;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Notifications\ApiForgeTokenExpiringNotification;
 use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 
-class LifecycleUser extends \Illuminate\Foundation\Auth\User
+class LifecycleUser extends User
 {
-    use \Illuminate\Notifications\Notifiable;
+    use Notifiable;
 
     protected $table = 'users';
 }
@@ -22,8 +24,8 @@ beforeEach(function () {
     config()->set('auth.providers.users.model', LifecycleUser::class);
 
     $this->user = LifecycleUser::create([
-        'name'     => 'Lifecycle User',
-        'email'    => 'lifecycle-' . uniqid() . '@example.com',
+        'name' => 'Lifecycle User',
+        'email' => 'lifecycle-'.uniqid().'@example.com',
         'password' => bcrypt('secret'),
     ]);
 
@@ -51,8 +53,8 @@ it('does not issue a refresh token by default', function () {
 it('exchanges a refresh token for new access + refresh tokens', function () {
     config()->set('filament-api-forge.auth.refresh_tokens', true);
 
-    $created  = $this->service->create($this->user, [
-        'name'       => 'Refreshable',
+    $created = $this->service->create($this->user, [
+        'name' => 'Refreshable',
         'expires_at' => now()->subDay(), // access token already expired
     ]);
 
@@ -122,12 +124,12 @@ it('notifies owners of tokens expiring within the window once', function () {
     Notification::fake();
 
     $expiring = $this->service->create($this->user, [
-        'name'       => 'Expiring soon',
+        'name' => 'Expiring soon',
         'expires_at' => now()->addDays(3),
     ])['record'];
 
     $this->service->create($this->user, [
-        'name'       => 'Far future',
+        'name' => 'Far future',
         'expires_at' => now()->addDays(300),
     ]);
 

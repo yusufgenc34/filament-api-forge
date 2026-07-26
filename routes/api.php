@@ -1,13 +1,12 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
+use Illuminate\Support\Facades\Route;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiActionController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiBatchController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiExportController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiNestedResourceController;
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiTokenController;
-use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,14 +46,14 @@ Route::delete('{panelId}/{resourceSlug}/{recordId}/force', [ApiResourceControlle
 // Collection-level custom actions (4 segments, literal prefix)
 Route::match(
     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    '{panelId}/{resourceSlug}/' . $actionsPrefix . '/{actionName}',
+    '{panelId}/{resourceSlug}/'.$actionsPrefix.'/{actionName}',
     [ApiActionController::class, 'executeCollection']
 )->name('api-forge.action.collection');
 
 // Record-level custom actions (5 segments, literal prefix)
 Route::match(
     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    '{panelId}/{resourceSlug}/{recordId}/' . $actionsPrefix . '/{actionName}',
+    '{panelId}/{resourceSlug}/{recordId}/'.$actionsPrefix.'/{actionName}',
     [ApiActionController::class, 'execute']
 )->name('api-forge.action');
 

@@ -2,24 +2,24 @@
 
 namespace YusufGenc34\FilamentApiForge\Filament\V5\Resources\Pages;
 
+use Filament\Actions;
+use Filament\Forms;
+use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
+use Illuminate\Support\Facades\Auth;
 use YusufGenc34\FilamentApiForge\Filament\V5\Resources\ApiKeyResource;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Filament\Actions;
-use Filament\Forms;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Resources\Pages\ListRecords;
-use Filament\Schemas\Schema;
-use Filament\Support\Enums\Width;
-use Illuminate\Support\Facades\Auth;
 
 class ListApiKeys extends ListRecords
 {
     protected static string $resource = ApiKeyResource::class;
 
-    public function getMaxContentWidth(): Width | string | null
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Full;
     }
@@ -63,18 +63,18 @@ class ListApiKeys extends ListRecords
                     Forms\Components\ToggleButtons::make('scopes')
                         ->label('Permissions')
                         ->options([
-                            'read'   => 'Read',
-                            'write'  => 'Write',
+                            'read' => 'Read',
+                            'write' => 'Write',
                             'delete' => 'Delete',
                         ])
                         ->icons([
-                            'read'   => 'heroicon-o-eye',
-                            'write'  => 'heroicon-o-pencil-square',
+                            'read' => 'heroicon-o-eye',
+                            'write' => 'heroicon-o-pencil-square',
                             'delete' => 'heroicon-o-trash',
                         ])
                         ->colors([
-                            'read'   => 'info',
-                            'write'  => 'warning',
+                            'read' => 'info',
+                            'write' => 'warning',
                             'delete' => 'danger',
                         ])
                         ->multiple()
@@ -108,10 +108,10 @@ class ListApiKeys extends ListRecords
                         : ($data['scopes'] ?? ['read']);
 
                     $result = app(ApiForgeTokenService::class)->create(Auth::user(), [
-                        'name'              => $data['name'],
-                        'scopes'            => $scopes,
+                        'name' => $data['name'],
+                        'scopes' => $scopes,
                         'allowed_resources' => ! empty($data['allowed_resources']) ? $data['allowed_resources'] : null,
-                        'expires_at'        => $data['expires_at'] ?? null,
+                        'expires_at' => $data['expires_at'] ?? null,
                     ]);
 
                     $action->modalHeading('Token Generated');

@@ -1,14 +1,14 @@
 <?php
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Jobs\SendApiForgeWebhook;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeWebhook;
 use YusufGenc34\FilamentApiForge\Support\ResponseCacheManager;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\TestModel;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     if (! Schema::hasTable('test_models')) {
@@ -72,9 +72,9 @@ it('write events invalidate the response cache via the subscriber', function () 
 
 it('webhook listensTo matches events, wildcard and resource filters', function () {
     $hook = new ApiForgeWebhook([
-        'events'         => ['created', 'deleted'],
+        'events' => ['created', 'deleted'],
         'resource_class' => 'App\\PostResource',
-        'is_active'      => true,
+        'is_active' => true,
     ]);
 
     expect($hook->listensTo('created', 'App\\PostResource'))->toBeTrue()
@@ -94,15 +94,15 @@ it('dispatches webhook jobs for matching write events', function () {
     Queue::fake();
 
     ApiForgeWebhook::create([
-        'name'   => 'Created hook',
-        'url'    => 'https://example.com/hook',
+        'name' => 'Created hook',
+        'url' => 'https://example.com/hook',
         'events' => ['created'],
     ]);
 
     ApiForgeWebhook::create([
-        'name'           => 'Other resource only',
-        'url'            => 'https://example.com/other',
-        'events'         => ['created'],
+        'name' => 'Other resource only',
+        'url' => 'https://example.com/other',
+        'events' => ['created'],
         'resource_class' => 'App\\OtherResource',
     ]);
 
@@ -135,8 +135,8 @@ it('webhook job posts a signed payload', function () {
     Http::fake(['example.com/*' => Http::response('ok', 200)]);
 
     $webhook = ApiForgeWebhook::create([
-        'name'   => 'Signed',
-        'url'    => 'https://example.com/hook',
+        'name' => 'Signed',
+        'url' => 'https://example.com/hook',
         'secret' => 'shh',
         'events' => ['*'],
     ]);
@@ -159,8 +159,8 @@ it('webhook job increments failure_count on failed responses', function () {
     Http::fake(['example.com/*' => Http::response('nope', 500)]);
 
     $webhook = ApiForgeWebhook::create([
-        'name'   => 'Failing',
-        'url'    => 'https://example.com/hook',
+        'name' => 'Failing',
+        'url' => 'https://example.com/hook',
         'events' => ['*'],
     ]);
 

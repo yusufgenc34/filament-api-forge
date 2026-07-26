@@ -2,6 +2,10 @@
 
 namespace YusufGenc34\FilamentApiForge;
 
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
+use Spatie\LaravelPackageTools\Package;
+use Spatie\LaravelPackageTools\PackageServiceProvider;
 use YusufGenc34\FilamentApiForge\Commands\NotifyExpiringTokensCommand;
 use YusufGenc34\FilamentApiForge\Commands\PruneRequestLogsCommand;
 use YusufGenc34\FilamentApiForge\Contracts\FilamentSchemaAdapter;
@@ -19,10 +23,6 @@ use YusufGenc34\FilamentApiForge\Listeners\ApiForgeEventSubscriber;
 use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 use YusufGenc34\FilamentApiForge\Services\GraphQlSchemaService;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Route;
-use Spatie\LaravelPackageTools\Package;
-use Spatie\LaravelPackageTools\PackageServiceProvider;
 
 class FilamentApiForgeServiceProvider extends PackageServiceProvider
 {
@@ -98,7 +98,7 @@ class FilamentApiForgeServiceProvider extends PackageServiceProvider
     protected function registerRouteSet(string $prefix, string $namePrefix, ?string $version): void
     {
         $versionMiddleware = $version !== null
-            ? [SetApiForgeVersion::class . ':' . $version]
+            ? [SetApiForgeVersion::class.':'.$version]
             : [];
 
         // Public routes: OpenAPI spec + public docs HTML + token refresh (no access-token auth)
@@ -146,7 +146,7 @@ class FilamentApiForgeServiceProvider extends PackageServiceProvider
                 Route::post('graphql', [GraphQlController::class, 'execute'])
                     ->name('api-forge.graphql');
 
-                $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+                $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
             });
     }
 }

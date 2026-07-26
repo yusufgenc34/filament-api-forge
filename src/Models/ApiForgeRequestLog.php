@@ -23,9 +23,9 @@ class ApiForgeRequestLog extends Model
     ];
 
     protected $casts = [
-        'status'      => 'integer',
+        'status' => 'integer',
         'duration_ms' => 'integer',
-        'created_at'  => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public function token()

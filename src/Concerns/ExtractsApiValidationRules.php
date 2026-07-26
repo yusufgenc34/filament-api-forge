@@ -33,6 +33,7 @@ trait ExtractsApiValidationRules
                     ->mapWithKeys(function ($rule, $field) {
                         $ruleArray = is_array($rule) ? $rule : explode('|', $rule);
                         array_unshift($ruleArray, 'sometimes');
+
                         return [$field => $ruleArray];
                     })
                     ->toArray();
@@ -54,8 +55,8 @@ trait ExtractsApiValidationRules
 
         // 3. Fallback from Model $fillable
         $modelClass ??= $resourceClass::getModel();
-        $model      = new $modelClass();
-        $fillable   = $model->getFillable();
+        $model = new $modelClass;
+        $fillable = $model->getFillable();
 
         if (empty($fillable)) {
             return [];

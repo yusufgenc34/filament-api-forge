@@ -2,6 +2,12 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Routing\Controller;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreating;
@@ -11,12 +17,6 @@ use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
 use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Routing\Controller;
-use Spatie\QueryBuilder\QueryBuilder;
-use Spatie\QueryBuilder\AllowedFilter;
 
 class ApiNestedResourceController extends Controller
 {
@@ -29,10 +29,14 @@ class ApiNestedResourceController extends Controller
     public function index(Request $request, string $panelId, string $resourceSlug, string $recordId, string $childSlug): AnonymousResourceCollection|JsonResponse
     {
         $parent = $this->resolveParent($panelId, $resourceSlug, $recordId);
-        if ($parent instanceof JsonResponse) return $parent;
+        if ($parent instanceof JsonResponse) {
+            return $parent;
+        }
 
         $relation = $this->resolveRelation($parent, $childSlug, 'index');
-        if ($relation instanceof JsonResponse) return $relation;
+        if ($relation instanceof JsonResponse) {
+            return $relation;
+        }
 
         $parentModel = $parent['_record'];
         $relationName = $relation['relation_name'];
@@ -77,10 +81,14 @@ class ApiNestedResourceController extends Controller
     public function show(Request $request, string $panelId, string $resourceSlug, string $recordId, string $childSlug, string $childId): ApiForgeJsonResource|JsonResponse
     {
         $parent = $this->resolveParent($panelId, $resourceSlug, $recordId);
-        if ($parent instanceof JsonResponse) return $parent;
+        if ($parent instanceof JsonResponse) {
+            return $parent;
+        }
 
         $relation = $this->resolveRelation($parent, $childSlug, 'show');
-        if ($relation instanceof JsonResponse) return $relation;
+        if ($relation instanceof JsonResponse) {
+            return $relation;
+        }
 
         $parentModel = $parent['_record'];
 
@@ -105,10 +113,14 @@ class ApiNestedResourceController extends Controller
     public function store(Request $request, string $panelId, string $resourceSlug, string $recordId, string $childSlug): ApiForgeJsonResource|JsonResponse
     {
         $parent = $this->resolveParent($panelId, $resourceSlug, $recordId);
-        if ($parent instanceof JsonResponse) return $parent;
+        if ($parent instanceof JsonResponse) {
+            return $parent;
+        }
 
         $relation = $this->resolveRelation($parent, $childSlug, 'store');
-        if ($relation instanceof JsonResponse) return $relation;
+        if ($relation instanceof JsonResponse) {
+            return $relation;
+        }
 
         $parentModel = $parent['_record'];
         $resourceClass = $parent['resource_class'];
@@ -126,16 +138,20 @@ class ApiNestedResourceController extends Controller
             ApiResourceCreated::dispatch($resourceClass, $child, $data);
         }
 
-        return (new ApiForgeJsonResource($child));
+        return new ApiForgeJsonResource($child);
     }
 
     public function update(Request $request, string $panelId, string $resourceSlug, string $recordId, string $childSlug, string $childId): ApiForgeJsonResource|JsonResponse
     {
         $parent = $this->resolveParent($panelId, $resourceSlug, $recordId);
-        if ($parent instanceof JsonResponse) return $parent;
+        if ($parent instanceof JsonResponse) {
+            return $parent;
+        }
 
         $relation = $this->resolveRelation($parent, $childSlug, 'update');
-        if ($relation instanceof JsonResponse) return $relation;
+        if ($relation instanceof JsonResponse) {
+            return $relation;
+        }
 
         $parentModel = $parent['_record'];
         $resourceClass = $parent['resource_class'];
@@ -163,10 +179,14 @@ class ApiNestedResourceController extends Controller
     public function destroy(Request $request, string $panelId, string $resourceSlug, string $recordId, string $childSlug, string $childId): JsonResponse
     {
         $parent = $this->resolveParent($panelId, $resourceSlug, $recordId);
-        if ($parent instanceof JsonResponse) return $parent;
+        if ($parent instanceof JsonResponse) {
+            return $parent;
+        }
 
         $relation = $this->resolveRelation($parent, $childSlug, 'destroy');
-        if ($relation instanceof JsonResponse) return $relation;
+        if ($relation instanceof JsonResponse) {
+            return $relation;
+        }
 
         $parentModel = $parent['_record'];
         $resourceClass = $parent['resource_class'];
@@ -224,7 +244,7 @@ class ApiNestedResourceController extends Controller
         if (! in_array($method, $allowedMethods)) {
             return response()->json([
                 'message' => "Method '{$method}' is not allowed for this relation.",
-                'error'   => 'method_not_allowed',
+                'error' => 'method_not_allowed',
             ], 405);
         }
 

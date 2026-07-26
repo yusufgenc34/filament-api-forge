@@ -2,9 +2,10 @@
 
 namespace YusufGenc34\FilamentApiForge\Services;
 
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
+use Carbon\Carbon;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Str;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 
 class ApiForgeTokenService
 {
@@ -14,46 +15,45 @@ class ApiForgeTokenService
      * Returns the plain-text token ONCE — it is never stored anywhere.
      * Only the SHA-256 hash and a display prefix are persisted.
      *
-     * @param  Authenticatable $user
      * @param  array{
      *     name: string,
      *     scopes: string[],
-     *     expires_at: \Carbon\Carbon|string|null,
+     *     expires_at: Carbon|string|null,
      *     allowed_resources: string[]|null,
      * } $data
      * @return array{ record: ApiForgeToken, plain_text_token: string }
      */
     public function create(Authenticatable $user, array $data): array
     {
-        $plain  = 'forge_' . Str::random(40);
-        $hash   = hash('sha256', $plain);
+        $plain = 'forge_'.Str::random(40);
+        $hash = hash('sha256', $plain);
         $prefix = substr($plain, 0, 16); // 'forge_' + first 10 random chars
 
         $refreshPlain = null;
-        $refreshHash  = null;
+        $refreshHash = null;
 
         if (config('filament-api-forge.auth.refresh_tokens', false)) {
-            $refreshPlain = 'forge_refresh_' . Str::random(40);
-            $refreshHash  = hash('sha256', $refreshPlain);
+            $refreshPlain = 'forge_refresh_'.Str::random(40);
+            $refreshHash = hash('sha256', $refreshPlain);
         }
 
         $record = ApiForgeToken::create([
-            'user_id'            => $user->getAuthIdentifier(),
-            'name'               => $data['name'],
-            'token_hash'         => $hash,
-            'token_prefix'       => $prefix,
+            'user_id' => $user->getAuthIdentifier(),
+            'name' => $data['name'],
+            'token_hash' => $hash,
+            'token_prefix' => $prefix,
             'refresh_token_hash' => $refreshHash,
-            'scopes'             => $data['scopes'] ?? ['read'],
-            'allowed_resources'  => $data['allowed_resources'] ?? null,
-            'expires_at'         => $data['expires_at'] ?? null,
-            'tenant_id'          => $data['tenant_id'] ?? null,
-            'is_active'          => true,
+            'scopes' => $data['scopes'] ?? ['read'],
+            'allowed_resources' => $data['allowed_resources'] ?? null,
+            'expires_at' => $data['expires_at'] ?? null,
+            'tenant_id' => $data['tenant_id'] ?? null,
+            'is_active' => true,
         ]);
 
         return [
-            'record'                 => $record,
-            'plain_text_token'       => $plain,
-            'plain_refresh_token'    => $refreshPlain,
+            'record' => $record,
+            'plain_text_token' => $plain,
+            'plain_refresh_token' => $refreshPlain,
         ];
     }
 
@@ -66,18 +66,18 @@ class ApiForgeTokenService
      */
     public function rotate(ApiForgeToken $record): array
     {
-        $plain  = 'forge_' . Str::random(40);
+        $plain = 'forge_'.Str::random(40);
 
         $record->forceFill([
-            'token_hash'   => hash('sha256', $plain),
+            'token_hash' => hash('sha256', $plain),
             'token_prefix' => substr($plain, 0, 16),
-            'expires_at'   => now()->addDays(
+            'expires_at' => now()->addDays(
                 (int) config('filament-api-forge.auth.default_expiration_days', 365)
             ),
         ])->save();
 
         return [
-            'record'           => $record->fresh(),
+            'record' => $record->fresh(),
             'plain_text_token' => $plain,
         ];
     }
@@ -103,22 +103,22 @@ class ApiForgeTokenService
             return null;
         }
 
-        $plain        = 'forge_' . Str::random(40);
-        $refreshPlain = 'forge_refresh_' . Str::random(40);
+        $plain = 'forge_'.Str::random(40);
+        $refreshPlain = 'forge_refresh_'.Str::random(40);
 
         $record->forceFill([
-            'token_hash'         => hash('sha256', $plain),
-            'token_prefix'       => substr($plain, 0, 16),
+            'token_hash' => hash('sha256', $plain),
+            'token_prefix' => substr($plain, 0, 16),
             'refresh_token_hash' => hash('sha256', $refreshPlain),
-            'expires_at'         => now()->addDays(
+            'expires_at' => now()->addDays(
                 (int) config('filament-api-forge.auth.default_expiration_days', 365)
             ),
             'expiry_notified_at' => null,
         ])->save();
 
         return [
-            'record'              => $record->fresh(),
-            'plain_text_token'    => $plain,
+            'record' => $record->fresh(),
+            'plain_text_token' => $plain,
             'plain_refresh_token' => $refreshPlain,
         ];
     }

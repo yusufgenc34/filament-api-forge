@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
 use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
 use YusufGenc34\FilamentApiForge\Events\ApiActionExecuting;
@@ -7,10 +11,6 @@ use YusufGenc34\FilamentApiForge\Http\Controllers\ApiActionController;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use YusufGenc34\FilamentApiForge\Tests\Stubs\TestModel;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Schema;
 
 // ── Stub resource with record + collection actions ─────────────────────────
 
@@ -34,9 +34,9 @@ function makeActionController(): ApiActionController
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => CollectionActionResource::class,
-        'model_class'    => TestModel::class,
-        'slug'           => 'test-models',
-        'api_config'     => [],
+        'model_class' => TestModel::class,
+        'slug' => 'test-models',
+        'api_config' => [],
     ]);
 
     return new ApiActionController($mock);
@@ -114,9 +114,9 @@ it('registers action routes before nested wildcard routes', function () {
         ->values();
 
     $collectionActionIdx = $names->search('api-forge.action.collection');
-    $recordActionIdx     = $names->search('api-forge.action');
-    $nestedIndexIdx      = $names->search('api-forge.nested.index');
-    $nestedShowIdx       = $names->search('api-forge.nested.show');
+    $recordActionIdx = $names->search('api-forge.action');
+    $nestedIndexIdx = $names->search('api-forge.nested.index');
+    $nestedShowIdx = $names->search('api-forge.nested.show');
 
     expect($collectionActionIdx)->not->toBeFalse()
         ->and($recordActionIdx)->not->toBeFalse()
@@ -130,21 +130,21 @@ it('OpenAPI spec documents action, batch and nested endpoints', function () {
     $mock->shouldReceive('discoverForVersion')->andReturn(collect([
         [
             'resource_class' => CollectionActionResource::class,
-            'model_class'    => TestModel::class,
-            'panel_id'       => 'admin',
-            'slug'           => 'test-models',
-            'label'          => 'Test Model',
-            'plural_label'   => 'Test Models',
-            'api_config'     => [
+            'model_class' => TestModel::class,
+            'panel_id' => 'admin',
+            'slug' => 'test-models',
+            'label' => 'Test Model',
+            'plural_label' => 'Test Models',
+            'api_config' => [
                 'allowed_methods' => ['index', 'show'],
-                'relations'       => [
+                'relations' => [
                     'comments' => ['relation_name' => 'comments', 'allowed_methods' => ['index', 'show']],
                 ],
             ],
         ],
     ]));
     $mock->shouldReceive('getActions')->andReturn([
-        'sync'    => ['name' => 'sync', 'method' => 'POST', 'scope' => 'write', 'record' => false],
+        'sync' => ['name' => 'sync', 'method' => 'POST', 'scope' => 'write', 'record' => false],
         'publish' => ['name' => 'publish', 'method' => 'POST', 'scope' => 'write', 'record' => true],
     ]);
 

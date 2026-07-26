@@ -2,6 +2,7 @@
 
 namespace YusufGenc34\FilamentApiForge\Listeners;
 
+use Illuminate\Events\Dispatcher;
 use YusufGenc34\FilamentApiForge\Events\ApiActionExecuted;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceCreated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
@@ -11,7 +12,6 @@ use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Jobs\SendApiForgeWebhook;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeWebhook;
 use YusufGenc34\FilamentApiForge\Support\ResponseCacheManager;
-use Illuminate\Events\Dispatcher;
 
 /**
  * Central subscriber for API write events: fans out webhooks and
@@ -23,12 +23,12 @@ class ApiForgeEventSubscriber
      * Event class → webhook event name.
      */
     protected const EVENT_NAMES = [
-        ApiResourceCreated::class      => 'created',
-        ApiResourceUpdated::class      => 'updated',
-        ApiResourceDeleted::class      => 'deleted',
-        ApiResourceRestored::class     => 'restored',
+        ApiResourceCreated::class => 'created',
+        ApiResourceUpdated::class => 'updated',
+        ApiResourceDeleted::class => 'deleted',
+        ApiResourceRestored::class => 'restored',
         ApiResourceForceDeleted::class => 'force_deleted',
-        ApiActionExecuted::class       => 'action_executed',
+        ApiActionExecuted::class => 'action_executed',
     ];
 
     public function subscribe(Dispatcher $events): array
@@ -38,7 +38,7 @@ class ApiForgeEventSubscriber
 
     public function handle(object $event): void
     {
-        $eventName     = self::EVENT_NAMES[get_class($event)] ?? null;
+        $eventName = self::EVENT_NAMES[get_class($event)] ?? null;
         $resourceClass = $event->resourceClass ?? null;
 
         if (! $eventName || ! $resourceClass) {
@@ -66,15 +66,15 @@ class ApiForgeEventSubscriber
         $record = $event->record ?? null;
 
         $payload = [
-            'event'     => $eventName,
-            'resource'  => class_basename($resourceClass),
+            'event' => $eventName,
+            'resource' => class_basename($resourceClass),
             'resource_class' => $resourceClass,
             'timestamp' => now()->toIso8601String(),
         ];
 
         if ($record !== null) {
             $payload['record'] = [
-                'id'         => $record->getKey(),
+                'id' => $record->getKey(),
                 'attributes' => $record->attributesToArray(),
             ];
         }

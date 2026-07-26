@@ -84,9 +84,9 @@ it('findResource returns null when not found', function () {
 it('findResource returns resource when panel and slug match', function () {
     $expected = [
         'resource_class' => 'App\\Filament\\Resources\\PostResource',
-        'slug'           => 'posts',
-        'panel_id'       => 'admin',
-        'api_config'     => ['allowed_methods' => ['index']],
+        'slug' => 'posts',
+        'panel_id' => 'admin',
+        'api_config' => ['allowed_methods' => ['index']],
     ];
 
     $mock = Mockery::mock(ResourceDiscoveryService::class)->makePartial();
@@ -100,9 +100,9 @@ it('findResource returns resource when panel and slug match', function () {
 it('findResource falls back to slug-only search across panels', function () {
     $expected = [
         'resource_class' => 'App\\Filament\\Resources\\PostResource',
-        'slug'           => 'posts',
-        'panel_id'       => 'other',
-        'api_config'     => ['allowed_methods' => ['index']],
+        'slug' => 'posts',
+        'panel_id' => 'other',
+        'api_config' => ['allowed_methods' => ['index']],
     ];
 
     $mock = Mockery::mock(ResourceDiscoveryService::class)->makePartial();

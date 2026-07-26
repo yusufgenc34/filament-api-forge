@@ -2,9 +2,12 @@
 
 namespace YusufGenc34\FilamentApiForge\Services;
 
+use GraphQL\Error\UserError;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use YusufGenc34\FilamentApiForge\Concerns\ExecutesApiHooks;
 use YusufGenc34\FilamentApiForge\Concerns\ExtractsApiValidationRules;
 use YusufGenc34\FilamentApiForge\Concerns\ScopesTenant;
@@ -14,8 +17,6 @@ use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleted;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceDeleting;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdated;
 use YusufGenc34\FilamentApiForge\Events\ApiResourceUpdating;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 /**
  * Builds an executable GraphQL schema from the discovered HasApi resources.
@@ -41,15 +42,15 @@ class GraphQlSchemaService
 
     public function schema(): Schema
     {
-        $queryFields    = [];
+        $queryFields = [];
         $mutationFields = [];
 
         foreach ($this->discoveryService->discoverForVersion() as $resource) {
-            $allowed  = $resource['api_config']['allowed_methods'] ?? [];
-            $type     = $this->objectType($resource);
+            $allowed = $resource['api_config']['allowed_methods'] ?? [];
+            $type = $this->objectType($resource);
             $singular = Str::camel(Str::singular($resource['slug']));
-            $plural   = Str::camel(Str::plural($resource['slug']));
-            $studly   = Str::studly(Str::singular($resource['slug']));
+            $plural = Str::camel(Str::plural($resource['slug']));
+            $studly = Str::studly(Str::singular($resource['slug']));
 
             if (in_array('show', $allowed)) {
                 $queryFields[$singular] = [
@@ -64,9 +65,9 @@ class GraphQlSchemaService
                     'type' => $this->pageType($resource, $type),
                     'args' => array_merge(
                         [
-                            'page'    => Type::int(),
+                            'page' => Type::int(),
                             'perPage' => Type::int(),
-                            'search'  => Type::string(),
+                            'search' => Type::string(),
                         ],
                         $this->filterArgs($resource),
                     ),
@@ -101,7 +102,7 @@ class GraphQlSchemaService
 
         if (empty($queryFields)) {
             $queryFields['_service'] = [
-                'type'    => Type::string(),
+                'type' => Type::string(),
                 'resolve' => fn () => 'filament-api-forge',
             ];
         }
@@ -141,7 +142,7 @@ class GraphQlSchemaService
         }
 
         return $this->typeCache[$name] = new ObjectType([
-            'name'   => $name,
+            'name' => $name,
             'fields' => $fields,
             'resolveField' => function ($record, array $args, $context, $info) {
                 $value = $record->getAttribute($info->fieldName);
@@ -153,16 +154,16 @@ class GraphQlSchemaService
 
     protected function pageType(array $resource, ObjectType $type): ObjectType
     {
-        $name = $type->name . 'Page';
+        $name = $type->name.'Page';
 
         return $this->typeCache[$name] ??= new ObjectType([
-            'name'   => $name,
+            'name' => $name,
             'fields' => [
-                'data'        => Type::listOf($type),
-                'total'       => Type::int(),
-                'perPage'     => Type::int(),
+                'data' => Type::listOf($type),
+                'total' => Type::int(),
+                'perPage' => Type::int(),
                 'currentPage' => Type::int(),
-                'lastPage'    => Type::int(),
+                'lastPage' => Type::int(),
             ],
         ]);
     }
@@ -212,7 +213,7 @@ class GraphQlSchemaService
 
         foreach ($resource['api_config']['allowed_filters'] ?? [] as $filter) {
             if (isset($args[$filter])) {
-                $query->where($filter, 'LIKE', '%' . addcslashes($args[$filter], '\\%_') . '%');
+                $query->where($filter, 'LIKE', '%'.addcslashes($args[$filter], '\\%_').'%');
             }
         }
 
@@ -234,11 +235,11 @@ class GraphQlSchemaService
         $page = $query->paginate($perPage, ['*'], 'page', $args['page'] ?? 1);
 
         return [
-            'data'        => $page->items(),
-            'total'       => $page->total(),
-            'perPage'     => $page->perPage(),
+            'data' => $page->items(),
+            'total' => $page->total(),
+            'perPage' => $page->perPage(),
             'currentPage' => $page->currentPage(),
-            'lastPage'    => $page->lastPage(),
+            'lastPage' => $page->lastPage(),
         ];
     }
 
@@ -326,10 +327,10 @@ class GraphQlSchemaService
     // ── Scope enforcement ─────────────────────────────────────────────────
 
     protected const SCOPE_MAP = [
-        'index'   => 'read',
-        'show'    => 'read',
-        'store'   => 'write',
-        'update'  => 'write',
+        'index' => 'read',
+        'show' => 'read',
+        'store' => 'write',
+        'update' => 'write',
         'destroy' => 'delete',
     ];
 
@@ -350,7 +351,7 @@ class GraphQlSchemaService
         $token = request()->attributes->get('api_forge_token');
 
         if (! $token || ! $token->hasScope($requiredScope)) {
-            throw new \GraphQL\Error\UserError(
+            throw new UserError(
                 "This token does not have the required '{$requiredScope}' scope for this operation."
             );
         }
@@ -358,7 +359,7 @@ class GraphQlSchemaService
         $allowedResources = $token->allowed_resources;
 
         if (! empty($allowedResources) && ! in_array($resource['slug'], $allowedResources)) {
-            throw new \GraphQL\Error\UserError(
+            throw new UserError(
                 "This token is not authorized to access the '{$resource['slug']}' resource."
             );
         }

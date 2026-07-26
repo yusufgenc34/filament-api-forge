@@ -2,9 +2,9 @@
 
 namespace YusufGenc34\FilamentApiForge\Commands;
 
+use Illuminate\Console\Command;
 use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 use YusufGenc34\FilamentApiForge\Notifications\ApiForgeTokenExpiringNotification;
-use Illuminate\Console\Command;
 
 class NotifyExpiringTokensCommand extends Command
 {
@@ -27,7 +27,7 @@ class NotifyExpiringTokensCommand extends Command
             ->get();
 
         $notified = 0;
-        $failed   = 0;
+        $failed = 0;
 
         foreach ($tokens as $token) {
             $user = $token->user;
@@ -50,7 +50,7 @@ class NotifyExpiringTokensCommand extends Command
         }
 
         $this->info("Notified {$notified} token owner(s) about upcoming expiry (window: {$days} days)."
-            . ($failed > 0 ? " {$failed} failed." : ''));
+            .($failed > 0 ? " {$failed} failed." : ''));
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
     }

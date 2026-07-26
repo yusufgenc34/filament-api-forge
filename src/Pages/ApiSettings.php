@@ -2,39 +2,49 @@
 
 namespace YusufGenc34\FilamentApiForge\Pages;
 
-use YusufGenc34\FilamentApiForge\Contracts\HasApi;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
-use YusufGenc34\FilamentApiForge\Pages\DeveloperDashboard;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
+use YusufGenc34\FilamentApiForge\Contracts\HasApi;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 
 class ApiSettings extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
-    protected static string | \UnitEnum | null $navigationGroup = 'Developer Center';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Developer Center';
+
     protected static ?string $navigationLabel = 'Settings';
+
     protected static ?string $title = 'API Settings';
+
     protected static ?int $navigationSort = 4;
+
     protected static ?string $slug = 'developer/settings';
+
     protected string $view = 'filament-api-forge::api-settings';
 
-    public string $routeSegment          = '';
-    public array  $routePreview          = [];
-    public string $apiPrefix             = '';
-    public int    $totalRequests         = 0;
-    public string $formattedTotalRequests = '0';
-    public array  $tokenCounts           = [];
+    public string $routeSegment = '';
 
-    public function getMaxContentWidth(): Width | string | null
+    public array $routePreview = [];
+
+    public string $apiPrefix = '';
+
+    public int $totalRequests = 0;
+
+    public string $formattedTotalRequests = '0';
+
+    public array $tokenCounts = [];
+
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Full;
     }
 
     public function mount(): void
     {
-        $this->apiPrefix    = config('filament-api-forge.api_prefix', 'api/v1');
+        $this->apiPrefix = config('filament-api-forge.api_prefix', 'api/v1');
         $this->routeSegment = (string) (ApiForgeGlobalSetting::get('route_segment') ?? '');
         $this->buildRoutePreview();
         $this->loadRequestCounts();
@@ -56,6 +66,7 @@ class ApiSettings extends Page
                 ->body("'{$segment}' is a reserved route segment and cannot be used.")
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -88,16 +99,16 @@ class ApiSettings extends Page
 
     private function loadRequestCounts(): void
     {
-        $this->totalRequests          = (int) ApiForgeToken::sum('request_count');
+        $this->totalRequests = (int) ApiForgeToken::sum('request_count');
         $this->formattedTotalRequests = DeveloperDashboard::abbreviateCount($this->totalRequests);
 
         $this->tokenCounts = ApiForgeToken::orderByDesc('request_count')
             ->limit(10)
             ->get(['name', 'token_prefix', 'request_count', 'last_used_at'])
             ->map(fn ($t) => [
-                'name'      => $t->name,
-                'prefix'    => $t->token_prefix,
-                'count'     => $t->request_count,
+                'name' => $t->name,
+                'prefix' => $t->token_prefix,
+                'count' => $t->request_count,
                 'formatted' => DeveloperDashboard::abbreviateCount($t->request_count),
                 'last_used' => $t->last_used_at?->diffForHumans() ?? 'Never',
             ])
@@ -124,15 +135,15 @@ class ApiSettings extends Page
                     continue;
                 }
 
-                $slug        = $resourceClass::getSlug();
-                $panelId     = $panel->getId();
-                $label       = $resourceClass::getPluralModelLabel();
+                $slug = $resourceClass::getSlug();
+                $panelId = $panel->getId();
+                $label = $resourceClass::getPluralModelLabel();
                 $usedSegment = $segment ?: $panelId;
 
                 $this->routePreview[] = [
-                    'label'   => $label,
-                    'slug'    => $slug,
-                    'panel'   => $panelId,
+                    'label' => $label,
+                    'slug' => $slug,
+                    'panel' => $panelId,
                     'current' => "/{$this->apiPrefix}/{$panelId}/{$slug}",
                     'preview' => "/{$this->apiPrefix}/{$usedSegment}/{$slug}",
                     'changed' => $usedSegment !== $panelId,

@@ -2,6 +2,7 @@
 
 namespace YusufGenc34\FilamentApiForge\Http\Resources;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,7 +13,7 @@ class ApiForgeJsonResource extends JsonResource
      * resource class defines apiTransform(). Receives ($model, array $data)
      * and returns the transformed array.
      *
-     * @var (callable(\Illuminate\Database\Eloquent\Model, array): array)|null
+     * @var (callable(Model, array): array)|null
      */
     protected static $transformer = null;
 
@@ -56,7 +57,7 @@ class ApiForgeJsonResource extends JsonResource
         return [
             'meta' => [
                 'api_version' => config('filament-api-forge.api_version', 'v1'),
-                'timestamp'   => now()->toIso8601String(),
+                'timestamp' => now()->toIso8601String(),
             ],
         ];
     }

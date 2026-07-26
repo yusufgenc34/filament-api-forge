@@ -2,8 +2,10 @@
 
 namespace YusufGenc34\FilamentApiForge\Concerns;
 
-use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
+use YusufGenc34\FilamentApiForge\Http\Resources\ApiForgeJsonResource;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
 
 trait ResolvesApiResource
 {
@@ -11,13 +13,13 @@ trait ResolvesApiResource
      * HTTP method → required scope mapping.
      */
     protected const SCOPE_MAP = [
-        'index'       => 'read',
-        'show'        => 'read',
-        'export'      => 'read',
-        'store'       => 'write',
-        'update'      => 'write',
-        'restore'     => 'write',
-        'destroy'     => 'delete',
+        'index' => 'read',
+        'show' => 'read',
+        'export' => 'read',
+        'store' => 'write',
+        'update' => 'write',
+        'restore' => 'write',
+        'destroy' => 'delete',
         'forceDelete' => 'delete',
     ];
 
@@ -31,14 +33,14 @@ trait ResolvesApiResource
         if (! $resource) {
             return response()->json([
                 'message' => 'Resource not found.',
-                'error'   => 'not_found',
+                'error' => 'not_found',
             ], 404);
         }
 
         if (! $this->discoveryService->isMethodAllowed($resource, $method)) {
             return response()->json([
                 'message' => "Method '{$method}' is not allowed for this resource.",
-                'error'   => 'method_not_allowed',
+                'error' => 'method_not_allowed',
             ], 405);
         }
 
@@ -50,13 +52,13 @@ trait ResolvesApiResource
             ?? null;
 
         if ($requiredScope && config('filament-api-forge.auth.enabled', true)) {
-            /** @var \YusufGenc34\FilamentApiForge\Models\ApiForgeToken|null $token */
+            /** @var ApiForgeToken|null $token */
             $token = request()->attributes->get('api_forge_token');
 
             if (! $token || ! $token->hasScope($requiredScope)) {
                 return response()->json([
                     'message' => "This token does not have the required '{$requiredScope}' scope for this operation.",
-                    'error'   => 'insufficient_scope',
+                    'error' => 'insufficient_scope',
                     'required_scope' => $requiredScope,
                 ], 403);
             }
@@ -67,7 +69,7 @@ trait ResolvesApiResource
             if (! empty($allowedResources) && ! in_array($resourceSlug, $allowedResources)) {
                 return response()->json([
                     'message' => "This token is not authorized to access the '{$resourceSlug}' resource.",
-                    'error'   => 'resource_not_allowed',
+                    'error' => 'resource_not_allowed',
                 ], 403);
             }
         }
@@ -81,6 +83,56 @@ trait ResolvesApiResource
                 : null
         );
 
+        if (in_array($method, ['index', 'store', 'export'])) {
+            $policyError = $this->checkPolicy($resource, $method);
+            if ($policyError) {
+                return $policyError;
+            }
+        }
+
         return $resource;
+    }
+
+    /**
+     * Check Laravel Policy authorization for a resource action.
+     */
+    protected function checkPolicy(array $resource, string $method, mixed $target = null): ?JsonResponse
+    {
+        $usePolicies = $resource['api_config']['use_policies']
+            ?? config('filament-api-forge.policies.enabled', false);
+
+        if (! $usePolicies) {
+            return null;
+        }
+
+        $modelClass = $resource['model_class'];
+        $target ??= $modelClass;
+
+        if (! Gate::getPolicyFor($target) && ! Gate::getPolicyFor($modelClass)) {
+            return null;
+        }
+
+        $ability = match ($method) {
+            'index', 'export' => 'viewAny',
+            'show' => 'view',
+            'store' => 'create',
+            'update' => 'update',
+            'destroy' => 'delete',
+            'restore' => 'restore',
+            'forceDelete' => 'forceDelete',
+            default => str_starts_with($method, 'action.') ? substr($method, 7) : $method,
+        };
+
+        $user = request()->user();
+
+        if (Gate::forUser($user)->denies($ability, $target)) {
+            return response()->json([
+                'message' => 'This action is unauthorized by policy.',
+                'error' => 'forbidden',
+                'required_ability' => $ability,
+            ], 403);
+        }
+
+        return null;
     }
 }

@@ -2,15 +2,17 @@
 
 namespace YusufGenc34\FilamentApiForge\Filament\V5\Resources;
 
-use YusufGenc34\FilamentApiForge\Contracts\FilamentSchemaAdapter;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
-use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use YusufGenc34\FilamentApiForge\Contracts\FilamentSchemaAdapter;
+use YusufGenc34\FilamentApiForge\Filament\V5\Resources\Pages\ListApiKeys;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
+use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 
 class ApiKeyResource extends Resource
 {
@@ -56,18 +58,18 @@ class ApiKeyResource extends Resource
                     ->label('Scopes')
                     ->badge()
                     ->formatStateUsing(fn (string $state) => match ($state) {
-                        '*'      => 'Full Access',
-                        'read'   => 'Read',
-                        'write'  => 'Write',
+                        '*' => 'Full Access',
+                        'read' => 'Read',
+                        'write' => 'Write',
                         'delete' => 'Delete',
-                        default  => $state,
+                        default => $state,
                     })
                     ->color(fn (string $state) => match ($state) {
-                        '*'      => 'danger',
-                        'read'   => 'info',
-                        'write'  => 'warning',
+                        '*' => 'danger',
+                        'read' => 'info',
+                        'write' => 'warning',
                         'delete' => 'danger',
-                        default  => 'gray',
+                        default => 'gray',
                     }),
 
                 Tables\Columns\TextColumn::make('request_count')
@@ -127,12 +129,12 @@ class ApiKeyResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => \YusufGenc34\FilamentApiForge\Filament\V5\Resources\Pages\ListApiKeys::route('/'),
+            'index' => ListApiKeys::route('/'),
             // no edit page → EditAction automatically opens a modal
         ];
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->where('user_id', Auth::id());
     }

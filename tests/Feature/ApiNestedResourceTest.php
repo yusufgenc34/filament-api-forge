@@ -1,16 +1,17 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Schema;
 use YusufGenc34\FilamentApiForge\Http\Controllers\ApiNestedResourceController;
 use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 // ── Test models ────────────────────────────────────────────────────────────
 
 class ParentModel extends Model
 {
     protected $table = 'parent_models';
+
     protected $fillable = ['title'];
 
     public function children()
@@ -22,6 +23,7 @@ class ParentModel extends Model
 class ChildModel extends Model
 {
     protected $table = 'child_models';
+
     protected $fillable = ['parent_id', 'name', 'status'];
 }
 
@@ -77,9 +79,9 @@ it('nested controller resolveParent finds parent record', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\ParentResource',
-        'model_class'    => ParentModel::class,
-        'slug'           => 'parents',
-        'api_config'     => [
+        'model_class' => ParentModel::class,
+        'slug' => 'parents',
+        'api_config' => [
             'relations' => [
                 'children' => ['allowed_methods' => ['index', 'show']],
             ],
@@ -99,9 +101,9 @@ it('nested controller returns 404 for unknown relation', function () {
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\ParentResource',
-        'model_class'    => ParentModel::class,
-        'slug'           => 'parents',
-        'api_config'     => [],
+        'model_class' => ParentModel::class,
+        'slug' => 'parents',
+        'api_config' => [],
     ]);
 
     $controller = new ApiNestedResourceController($mock);
@@ -109,7 +111,7 @@ it('nested controller returns 404 for unknown relation', function () {
 
     $result = $ref->invoke($controller, ['api_config' => []], 'unknown', 'index');
 
-    expect($result)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($result)->toBeInstanceOf(JsonResponse::class);
     expect($result->getStatusCode())->toBe(404);
 });
 
@@ -117,9 +119,9 @@ it('nested controller returns 405 for disabled method on relation', function () 
     $mock = Mockery::mock(ResourceDiscoveryService::class);
     $mock->shouldReceive('findResource')->andReturn([
         'resource_class' => 'App\\Filament\\Resources\\ParentResource',
-        'model_class'    => ParentModel::class,
-        'slug'           => 'parents',
-        'api_config'     => [
+        'model_class' => ParentModel::class,
+        'slug' => 'parents',
+        'api_config' => [
             'relations' => [
                 'children' => ['allowed_methods' => ['index']],
             ],
@@ -135,6 +137,6 @@ it('nested controller returns 405 for disabled method on relation', function () 
     $relationRef = new ReflectionMethod($controller, 'resolveRelation');
     $result = $relationRef->invoke($controller, $parent, 'children', 'store');
 
-    expect($result)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($result)->toBeInstanceOf(JsonResponse::class);
     expect($result->getStatusCode())->toBe(405);
 });

@@ -20,17 +20,27 @@ class ApiForgeGlobalSetting extends Model
 
         $value = $record->value;
 
-        if ($value === 'true')  return true;
-        if ($value === 'false') return false;
-        if ($value === 'null')  return null;
+        if ($value === 'true') {
+            return true;
+        }
+        if ($value === 'false') {
+            return false;
+        }
+        if ($value === 'null') {
+            return null;
+        }
 
         return $value;
     }
 
     public static function set(string $key, mixed $value): void
     {
-        if (is_bool($value)) $value = $value ? 'true' : 'false';
-        if (is_null($value))  $value = 'null';
+        if (is_bool($value)) {
+            $value = $value ? 'true' : 'false';
+        }
+        if (is_null($value)) {
+            $value = 'null';
+        }
 
         static::updateOrCreate(['key' => $key], ['value' => (string) $value]);
     }

@@ -1,15 +1,17 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
 use Illuminate\Database\Eloquent\Model;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiResourceController;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
+use YusufGenc34\FilamentApiForge\Traits\ApiForgeHooks;
 
 it('usesApiForgeHooks returns true for class using trait', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
-    $class = new class {
+    $class = new class
+    {
         use ApiForgeHooks;
     };
 
@@ -21,7 +23,7 @@ it('usesApiForgeHooks returns true for class using trait', function () {
 
 it('usesApiForgeHooks returns false for class without trait', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     $ref = new ReflectionMethod($controller, 'usesApiForgeHooks');
@@ -32,7 +34,7 @@ it('usesApiForgeHooks returns false for class without trait', function () {
 
 it('executeBeforeHooks returns data unchanged when no trait', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     config()->set('filament-api-forge.events.enabled', true);
@@ -45,7 +47,7 @@ it('executeBeforeHooks returns data unchanged when no trait', function () {
 
 it('executeAfterHooks does not throw for non-trait class', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     config()->set('filament-api-forge.events.enabled', true);
@@ -54,12 +56,12 @@ it('executeAfterHooks does not throw for non-trait class', function () {
     $model = Mockery::mock(Model::class);
 
     expect(fn () => $ref->invoke($controller, Model::class, 'afterCreate', $model, ['title' => 'Test']))
-        ->not->toThrow(\Exception::class);
+        ->not->toThrow(Exception::class);
 });
 
 it('executeVoidHooks does not throw for non-trait class', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     config()->set('filament-api-forge.events.enabled', true);
@@ -68,19 +70,20 @@ it('executeVoidHooks does not throw for non-trait class', function () {
     $model = Mockery::mock(Model::class);
 
     expect(fn () => $ref->invoke($controller, Model::class, 'beforeDelete', $model))
-        ->not->toThrow(\Exception::class);
+        ->not->toThrow(Exception::class);
 });
 
 it('hooks are skipped when events config is disabled', function () {
     $controller = new ApiResourceController(
-        Mockery::mock(\YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService::class)
+        Mockery::mock(ResourceDiscoveryService::class)
     );
 
     config()->set('filament-api-forge.events.enabled', false);
 
     $ref = new ReflectionMethod($controller, 'executeBeforeHooks');
 
-    $class = new class {
+    $class = new class
+    {
         use ApiForgeHooks;
     };
 
@@ -91,7 +94,8 @@ it('hooks are skipped when events config is disabled', function () {
 
 it('shouldSkipHooks auto-resets after a single read', function () {
     // Two consecutive reads: first true, second false
-    $class = new class {
+    $class = new class
+    {
         use ApiForgeHooks;
     };
 

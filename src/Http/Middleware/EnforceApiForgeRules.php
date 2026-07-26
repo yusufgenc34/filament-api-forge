@@ -3,11 +3,11 @@
 namespace YusufGenc34\FilamentApiForge\Http\Middleware;
 
 use Closure;
-use YusufGenc34\FilamentApiForge\Contracts\HasApi;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
+use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 
 class EnforceApiForgeRules
 {
@@ -17,8 +17,8 @@ class EnforceApiForgeRules
 
     public function handle(Request $request, Closure $next): mixed
     {
-        $panelId  = $request->route('panelId');
-        $slug     = $request->route('resourceSlug');
+        $panelId = $request->route('panelId');
+        $slug = $request->route('resourceSlug');
 
         if (! $panelId || ! $slug) {
             return $next($request);
@@ -31,13 +31,13 @@ class EnforceApiForgeRules
         }
 
         $resourceClass = $resourceData['resource_class'];
-        $action        = $this->resolveAction($request);
-        $setting       = ApiForgeResourceSetting::where('resource_class', $resourceClass)->first();
+        $action = $this->resolveAction($request);
+        $setting = ApiForgeResourceSetting::where('resource_class', $resourceClass)->first();
 
         // ── IP check ─────────────────────────────────────────────────────
         $clientIp = $request->ip();
 
-        $methodIps   = $setting ? ($setting->getMethodConfig($action)['allowed_ips'] ?? []) : [];
+        $methodIps = $setting ? ($setting->getMethodConfig($action)['allowed_ips'] ?? []) : [];
         $resourceIps = $setting ? ($setting->allowed_ips ?? []) : [];
 
         // Method-level IPs take precedence; fall back to resource-level
@@ -46,14 +46,14 @@ class EnforceApiForgeRules
         if (! empty($effectiveIps) && ! $this->isIpAllowed($clientIp, $effectiveIps)) {
             return response()->json([
                 'message' => 'Your IP address is not allowed to access this resource.',
-                'error'   => 'ip_forbidden',
+                'error' => 'ip_forbidden',
             ], 403);
         }
 
         // ── Rate limit ───────────────────────────────────────────────────
-        $methodLimit   = $setting ? ($setting->getMethodConfig($action)['rate_limit'] ?? null) : null;
+        $methodLimit = $setting ? ($setting->getMethodConfig($action)['rate_limit'] ?? null) : null;
         $resourceLimit = $setting?->rate_limit;
-        $globalLimit   = (int) config('filament-api-forge.rate_limit', 60);
+        $globalLimit = (int) config('filament-api-forge.rate_limit', 60);
 
         $limit = $methodLimit ?? $resourceLimit ?? $globalLimit;
 
@@ -68,12 +68,12 @@ class EnforceApiForgeRules
             $retryAfter = RateLimiter::availableIn($key);
 
             return response()->json([
-                'message'     => 'Too many requests.',
-                'error'       => 'rate_limit_exceeded',
+                'message' => 'Too many requests.',
+                'error' => 'rate_limit_exceeded',
                 'retry_after' => $retryAfter,
             ], 429)->header('Retry-After', $retryAfter)
-                   ->header('X-RateLimit-Limit', $limit)
-                   ->header('X-RateLimit-Remaining', 0);
+                ->header('X-RateLimit-Limit', $limit)
+                ->header('X-RateLimit-Remaining', 0);
         }
 
         RateLimiter::hit($key, 60);
@@ -100,16 +100,16 @@ class EnforceApiForgeRules
         try {
             $token = $request->attributes->get('api_forge_token');
 
-            \YusufGenc34\FilamentApiForge\Models\ApiForgeRequestLog::create([
-                'token_id'       => $token?->id,
+            ApiForgeRequestLog::create([
+                'token_id' => $token?->id,
                 'resource_class' => $resourceClass,
-                'action'         => substr($action, 0, 64),
-                'method'         => substr($request->method(), 0, 10),
-                'path'           => substr($request->path(), 0, 2048),
-                'status'         => method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 0,
-                'duration_ms'    => (int) round((microtime(true) - $startedAt) * 1000),
-                'ip'             => $request->ip(),
-                'created_at'     => now(),
+                'action' => substr($action, 0, 64),
+                'method' => substr($request->method(), 0, 10),
+                'path' => substr($request->path(), 0, 2048),
+                'status' => method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 0,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'ip' => $request->ip(),
+                'created_at' => now(),
             ]);
         } catch (\Throwable) {
             // Audit logging must never break the API response
@@ -121,18 +121,18 @@ class EnforceApiForgeRules
         // Custom action detection
         $actionName = $request->route('actionName');
         if ($actionName) {
-            return 'action.' . $actionName;
+            return 'action.'.$actionName;
         }
 
         // Literal-suffix routes (restore / force delete / export)
         $routeName = $request->route()?->getName();
 
         $named = match ($routeName) {
-            'api-forge.restore'       => 'restore',
+            'api-forge.restore' => 'restore',
             'api-forge.force-destroy' => 'forceDelete',
-            'api-forge.export'        => 'export',
-            'api-forge.batch'         => 'batch',
-            default                   => null,
+            'api-forge.export' => 'export',
+            'api-forge.batch' => 'batch',
+            default => null,
         };
 
         if ($named) {
@@ -142,12 +142,12 @@ class EnforceApiForgeRules
         $method = strtoupper($request->method());
 
         return match (true) {
-            $method === 'GET'    && ! $request->route('recordId') => 'index',
-            $method === 'GET'    && (bool) $request->route('recordId') => 'show',
-            $method === 'POST'   => 'store',
+            $method === 'GET' && ! $request->route('recordId') => 'index',
+            $method === 'GET' && (bool) $request->route('recordId') => 'show',
+            $method === 'POST' => 'store',
             in_array($method, ['PUT', 'PATCH']) => 'update',
             $method === 'DELETE' => 'destroy',
-            default              => 'index',
+            default => 'index',
         };
     }
 
@@ -165,15 +165,17 @@ class EnforceApiForgeRules
                 if ($this->ipInCidr($clientIp, $rule)) {
                     return true;
                 }
+
                 continue;
             }
 
             // Wildcard (e.g. 192.168.1.*)
             if (str_contains($rule, '*')) {
-                $pattern = '/^' . str_replace('\*', '\d+', preg_quote($rule, '/')) . '$/';
+                $pattern = '/^'.str_replace('\*', '\d+', preg_quote($rule, '/')).'$/';
                 if (preg_match($pattern, $clientIp)) {
                     return true;
                 }
+
                 continue;
             }
 
@@ -190,7 +192,7 @@ class EnforceApiForgeRules
         [$subnet, $bits] = explode('/', $cidr, 2);
         $bits = (int) $bits;
 
-        $ipBin     = @inet_pton($ip);
+        $ipBin = @inet_pton($ip);
         $subnetBin = @inet_pton($subnet);
 
         if ($ipBin === false || $subnetBin === false) {

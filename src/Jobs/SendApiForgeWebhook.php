@@ -2,13 +2,13 @@
 
 namespace YusufGenc34\FilamentApiForge\Jobs;
 
-use YusufGenc34\FilamentApiForge\Models\ApiForgeWebhook;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeWebhook;
 
 class SendApiForgeWebhook implements ShouldQueue
 {
@@ -38,9 +38,9 @@ class SendApiForgeWebhook implements ShouldQueue
         $body = json_encode($this->payload);
 
         $headers = [
-            'Content-Type'      => 'application/json',
-            'User-Agent'        => 'FilamentApiForge-Webhook/1.0',
-            'X-ApiForge-Event'  => $this->payload['event'] ?? 'unknown',
+            'Content-Type' => 'application/json',
+            'User-Agent' => 'FilamentApiForge-Webhook/1.0',
+            'X-ApiForge-Event' => $this->payload['event'] ?? 'unknown',
         ];
 
         if ($webhook->secret) {
@@ -76,6 +76,6 @@ class SendApiForgeWebhook implements ShouldQueue
 
     public static function sign(string $body, string $secret): string
     {
-        return 'sha256=' . hash_hmac('sha256', $body, $secret);
+        return 'sha256='.hash_hmac('sha256', $body, $secret);
     }
 }

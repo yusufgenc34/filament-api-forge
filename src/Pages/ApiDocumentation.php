@@ -2,53 +2,76 @@
 
 namespace YusufGenc34\FilamentApiForge\Pages;
 
-use YusufGenc34\FilamentApiForge\Attributes\ApiTag;
-use YusufGenc34\FilamentApiForge\Contracts\HasApi;
-use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
-use YusufGenc34\FilamentApiForge\Services\ResourceDiscoveryService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Str;
+use YusufGenc34\FilamentApiForge\Http\Controllers\ApiDocumentationController;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeGlobalSetting;
+use YusufGenc34\FilamentApiForge\Support\FeatureGuides;
 
 class ApiDocumentation extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-text';
-    protected static string | \UnitEnum | null $navigationGroup = 'Developer Center';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Developer Center';
+
     protected static ?string $navigationLabel = 'API Docs';
+
     protected static ?string $title = 'API Documentation';
+
     protected static ?int $navigationSort = 2;
+
     protected static ?string $slug = 'developer/api-docs';
+
     protected string $view = 'filament-api-forge::api-documentation';
 
-    public array  $groupedEndpoints    = [];
-    public array  $schemas             = [];
-    public array  $responseComponents  = [];
-    public string $baseUrl             = '';
-    public string $version             = '';
-    public string $apiTitle            = '';
-    public string $apiDescription      = '';
-    public string $openApiUrl          = '';
+    public array $groupedEndpoints = [];
 
-    public array   $collapsedGroups    = [];
+    public array $schemas = [];
+
+    public array $responseComponents = [];
+
+    public string $baseUrl = '';
+
+    public string $version = '';
+
+    public string $apiTitle = '';
+
+    public string $apiDescription = '';
+
+    public string $openApiUrl = '';
+
+    public array $collapsedGroups = [];
+
     public ?string $selectedEndpointId = null;
-    public ?array  $selectedEndpoint   = null;
+
+    public ?array $selectedEndpoint = null;
+
     public ?string $selectedSchemaName = null;
-    public array   $guides             = [];
-    public ?string $selectedGuideKey   = null;
-    public array   $availableVersions  = [];
-    public ?string $docsVersion        = null;
 
-    public bool   $docsPublic   = false;
-    public bool   $tryPanelOpen = false;
-    public string $tryToken     = '';
-    public string $tryUrl       = '';
-    public string $tryBody      = '{}';
-    public array  $tryQueryParams = [];
+    public array $guides = [];
 
-    public function getMaxContentWidth(): Width | string | null
+    public ?string $selectedGuideKey = null;
+
+    public array $availableVersions = [];
+
+    public ?string $docsVersion = null;
+
+    public bool $docsPublic = false;
+
+    public bool $tryPanelOpen = false;
+
+    public string $tryToken = '';
+
+    public string $tryUrl = '';
+
+    public string $tryBody = '{}';
+
+    public array $tryQueryParams = [];
+
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Full;
     }
@@ -57,18 +80,18 @@ class ApiDocumentation extends Page
     {
         $versions = config('filament-api-forge.versions');
         $this->availableVersions = is_array($versions) ? array_values($versions) : [];
-        $this->docsVersion       = $this->availableVersions[0] ?? null;
+        $this->docsVersion = $this->availableVersions[0] ?? null;
 
         $controller = app(ApiDocumentationController::class);
         $data = $controller->openApiSpec(request(), $this->docsVersion)->getData(true);
 
-        $this->baseUrl            = $data['servers'][0]['url'] ?? url('/');
-        $this->version            = $data['info']['version'] ?? 'v1';
-        $this->apiTitle           = $data['info']['title'] ?? 'API Documentation';
-        $this->apiDescription     = $data['info']['description'] ?? '';
-        $this->schemas            = $data['components']['schemas'] ?? [];
+        $this->baseUrl = $data['servers'][0]['url'] ?? url('/');
+        $this->version = $data['info']['version'] ?? 'v1';
+        $this->apiTitle = $data['info']['title'] ?? 'API Documentation';
+        $this->apiDescription = $data['info']['description'] ?? '';
+        $this->schemas = $data['components']['schemas'] ?? [];
         $this->responseComponents = $data['components']['responses'] ?? [];
-        $this->openApiUrl         = route('api-forge.docs.openapi');
+        $this->openApiUrl = route('api-forge.docs.openapi');
 
         $this->docsPublic = (bool) ApiForgeGlobalSetting::get('docs_public', false);
 
@@ -76,12 +99,12 @@ class ApiDocumentation extends Page
         foreach ($data['paths'] ?? [] as $path => $methods) {
             foreach ($methods as $method => $operation) {
                 $tag = $operation['tags'][0] ?? 'General';
-                $id  = Str::slug($method . '-' . str_replace(['/', '{', '}'], ['-', '', ''], $path));
+                $id = Str::slug($method.'-'.str_replace(['/', '{', '}'], ['-', '', ''], $path));
                 $grouped[$tag][] = [
-                    'id'        => $id,
-                    'method'    => strtoupper($method),
-                    'path'      => $path,
-                    'summary'   => $operation['summary'] ?? '',
+                    'id' => $id,
+                    'method' => strtoupper($method),
+                    'path' => $path,
+                    'summary' => $operation['summary'] ?? '',
                     'operation' => $operation,
                 ];
             }
@@ -90,7 +113,7 @@ class ApiDocumentation extends Page
 
         $this->guides = $this->buildGuides();
 
-        if (!empty($grouped)) {
+        if (! empty($grouped)) {
             $firstGroup = array_key_first($grouped);
             $this->selectEndpoint($grouped[$firstGroup][0]['id']);
         }
@@ -102,11 +125,11 @@ class ApiDocumentation extends Page
             return;
         }
 
-        $this->selectedGuideKey   = $key;
+        $this->selectedGuideKey = $key;
         $this->selectedEndpointId = null;
-        $this->selectedEndpoint   = null;
+        $this->selectedEndpoint = null;
         $this->selectedSchemaName = null;
-        $this->tryPanelOpen       = false;
+        $this->tryPanelOpen = false;
     }
 
     public function selectVersion(string $version): void
@@ -120,21 +143,21 @@ class ApiDocumentation extends Page
         $controller = app(ApiDocumentationController::class);
         $data = $controller->openApiSpec(request(), $version)->getData(true);
 
-        $this->baseUrl            = $data['servers'][0]['url'] ?? url('/');
-        $this->version            = $data['info']['version'] ?? $version;
-        $this->schemas            = $data['components']['schemas'] ?? [];
+        $this->baseUrl = $data['servers'][0]['url'] ?? url('/');
+        $this->version = $data['info']['version'] ?? $version;
+        $this->schemas = $data['components']['schemas'] ?? [];
         $this->responseComponents = $data['components']['responses'] ?? [];
 
         $grouped = [];
         foreach ($data['paths'] ?? [] as $path => $methods) {
             foreach ($methods as $method => $operation) {
                 $tag = $operation['tags'][0] ?? 'General';
-                $id  = Str::slug($method . '-' . str_replace(['/', '{', '}'], ['-', '', ''], $path));
+                $id = Str::slug($method.'-'.str_replace(['/', '{', '}'], ['-', '', ''], $path));
                 $grouped[$tag][] = [
-                    'id'        => $id,
-                    'method'    => strtoupper($method),
-                    'path'      => $path,
-                    'summary'   => $operation['summary'] ?? '',
+                    'id' => $id,
+                    'method' => strtoupper($method),
+                    'path' => $path,
+                    'summary' => $operation['summary'] ?? '',
                     'operation' => $operation,
                 ];
             }
@@ -144,9 +167,9 @@ class ApiDocumentation extends Page
         $this->guides = $this->buildGuides();
 
         $this->selectedEndpointId = null;
-        $this->selectedEndpoint   = null;
+        $this->selectedEndpoint = null;
         $this->selectedSchemaName = null;
-        $this->selectedGuideKey   = null;
+        $this->selectedGuideKey = null;
 
         if (! empty($grouped)) {
             $firstGroup = array_key_first($grouped);
@@ -163,7 +186,7 @@ class ApiDocumentation extends Page
      */
     protected function buildGuides(): array
     {
-        return \YusufGenc34\FilamentApiForge\Support\FeatureGuides::build($this->baseUrl);
+        return FeatureGuides::build($this->baseUrl);
     }
 
     public function togglePublicDocs(): void
@@ -213,21 +236,21 @@ class ApiDocumentation extends Page
     private function reinitialize(): void
     {
         $controller = app(ApiDocumentationController::class);
-        $data       = $controller->openApiSpec(request(), $this->docsVersion)->getData(true);
+        $data = $controller->openApiSpec(request(), $this->docsVersion)->getData(true);
 
-        $this->schemas            = $data['components']['schemas'] ?? [];
+        $this->schemas = $data['components']['schemas'] ?? [];
         $this->responseComponents = $data['components']['responses'] ?? [];
 
         $grouped = [];
         foreach ($data['paths'] ?? [] as $path => $methods) {
             foreach ($methods as $method => $operation) {
-                $tag     = $operation['tags'][0] ?? 'General';
-                $id      = Str::slug($method . '-' . str_replace(['/', '{', '}'], ['-', '', ''], $path));
+                $tag = $operation['tags'][0] ?? 'General';
+                $id = Str::slug($method.'-'.str_replace(['/', '{', '}'], ['-', '', ''], $path));
                 $grouped[$tag][] = [
-                    'id'        => $id,
-                    'method'    => strtoupper($method),
-                    'path'      => $path,
-                    'summary'   => $operation['summary'] ?? '',
+                    'id' => $id,
+                    'method' => strtoupper($method),
+                    'path' => $path,
+                    'summary' => $operation['summary'] ?? '',
                     'operation' => $operation,
                 ];
             }
@@ -246,7 +269,7 @@ class ApiDocumentation extends Page
                 }
             }
             if (! $found) {
-                $this->selectedEndpoint   = null;
+                $this->selectedEndpoint = null;
                 $this->selectedEndpointId = null;
             }
         }
@@ -267,28 +290,30 @@ class ApiDocumentation extends Page
     {
         foreach ($this->groupedEndpoints as $endpoints) {
             foreach ($endpoints as $ep) {
-                if ($ep['id'] !== $id) continue;
+                if ($ep['id'] !== $id) {
+                    continue;
+                }
 
                 $this->selectedEndpointId = $id;
                 $this->selectedSchemaName = null;
-                $this->selectedGuideKey   = null;
-                $this->tryPanelOpen       = false;
+                $this->selectedGuideKey = null;
+                $this->tryPanelOpen = false;
 
                 $ep['operation']['responses'] = $this->resolveResponses(
                     $ep['operation']['responses'] ?? []
                 );
 
                 $this->selectedEndpoint = $ep;
-                $this->tryUrl           = $this->baseUrl . $ep['path'];
-                $this->tryQueryParams   = [];
+                $this->tryUrl = $this->baseUrl.$ep['path'];
+                $this->tryQueryParams = [];
 
                 foreach ($ep['operation']['parameters'] ?? [] as $param) {
                     if (($param['in'] ?? '') === 'query') {
                         $this->tryQueryParams[] = [
-                            'key'      => $param['name'],
-                            'value'    => '',
-                            'type'     => $param['schema']['type'] ?? 'string',
-                            'desc'     => $param['description'] ?? '',
+                            'key' => $param['name'],
+                            'value' => '',
+                            'type' => $param['schema']['type'] ?? 'string',
+                            'desc' => $param['description'] ?? '',
                             'required' => $param['required'] ?? false,
                         ];
                     }
@@ -302,27 +327,31 @@ class ApiDocumentation extends Page
                         $multipartSchema = $content['multipart/form-data']['schema'] ?? [];
                         $body = [];
                         foreach ($multipartSchema['properties'] ?? [] as $prop => $def) {
-                            if ($def['readOnly'] ?? false) continue;
+                            if ($def['readOnly'] ?? false) {
+                                continue;
+                            }
                             $isFile = ($def['format'] ?? '') === 'binary';
                             $body[$prop] = $isFile ? ($def['type'] === 'array' ? ['<file>', '<file>'] : '<file>') : match ($def['type'] ?? 'string') {
                                 'integer' => 0,
                                 'boolean' => false,
-                                default   => '',
+                                default => '',
                             };
                         }
                         $this->tryBody = json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
                     } elseif (isset($content['application/json'])) {
-                        $ref        = $content['application/json']['schema']['$ref'] ?? '';
+                        $ref = $content['application/json']['schema']['$ref'] ?? '';
                         $schemaName = str_replace('#/components/schemas/', '', $ref);
-                        $schema     = $this->schemas[$schemaName] ?? null;
+                        $schema = $this->schemas[$schemaName] ?? null;
                         if ($schema) {
                             $body = [];
                             foreach ($schema['properties'] ?? [] as $prop => $def) {
-                                if ($def['readOnly'] ?? false) continue;
+                                if ($def['readOnly'] ?? false) {
+                                    continue;
+                                }
                                 $body[$prop] = match ($def['type'] ?? 'string') {
                                     'integer' => 0,
                                     'boolean' => false,
-                                    default   => '',
+                                    default => '',
                                 };
                             }
                             $this->tryBody = json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -335,6 +364,7 @@ class ApiDocumentation extends Page
                 } else {
                     $this->tryBody = '';
                 }
+
                 return;
             }
         }
@@ -351,19 +381,19 @@ class ApiDocumentation extends Page
     {
         $this->selectedSchemaName = $name;
         $this->selectedEndpointId = null;
-        $this->selectedEndpoint   = null;
-        $this->selectedGuideKey   = null;
-        $this->tryPanelOpen       = false;
+        $this->selectedEndpoint = null;
+        $this->selectedGuideKey = null;
+        $this->tryPanelOpen = false;
     }
 
     public function getMethodColor(string $method): string
     {
         return match (strtoupper($method)) {
-            'GET'          => 'success',
-            'POST'         => 'info',
+            'GET' => 'success',
+            'POST' => 'info',
             'PUT', 'PATCH' => 'warning',
-            'DELETE'       => 'danger',
-            default        => 'gray',
+            'DELETE' => 'danger',
+            default => 'gray',
         };
     }
 
@@ -372,7 +402,7 @@ class ApiDocumentation extends Page
         $out = [];
         foreach ($responses as $code => $resp) {
             if (isset($resp['$ref'])) {
-                $key  = str_replace('#/components/responses/', '', $resp['$ref']);
+                $key = str_replace('#/components/responses/', '', $resp['$ref']);
                 $resp = $this->responseComponents[$key] ?? ['description' => $key];
             }
             $schema = $resp['content']['application/json']['schema'] ?? null;
@@ -381,14 +411,16 @@ class ApiDocumentation extends Page
             }
             $out[$code] = $resp;
         }
+
         return $out;
     }
 
     private function generateExampleFromSchema(array $schema): mixed
     {
         if (isset($schema['$ref'])) {
-            $name     = str_replace('#/components/schemas/', '', $schema['$ref']);
+            $name = str_replace('#/components/schemas/', '', $schema['$ref']);
             $resolved = $this->schemas[$name] ?? null;
+
             return $resolved ? $this->generateExampleFromSchema($resolved) : null;
         }
         if (array_key_exists('example', $schema)) {
@@ -400,18 +432,21 @@ class ApiDocumentation extends Page
             foreach ($schema['properties'] ?? [] as $prop => $def) {
                 $obj[$prop] = $this->generateExampleFromSchema($def);
             }
+
             return $obj;
         }
         if ($type === 'array') {
             $item = $this->generateExampleFromSchema($schema['items'] ?? ['type' => 'string']);
+
             return $item !== null ? [$item] : [];
         }
+
         return match ($type) {
             'integer' => 1,
-            'number'  => 1.0,
+            'number' => 1.0,
             'boolean' => true,
-            'null'    => null,
-            default   => '…',
+            'null' => null,
+            default => '…',
         };
     }
 }

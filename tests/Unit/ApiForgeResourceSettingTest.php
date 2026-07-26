@@ -13,7 +13,7 @@ it('creates a new resource setting with defaults', function () {
 });
 
 it('returns existing setting instead of creating duplicate', function () {
-    $first  = ApiForgeResourceSetting::forResource('App\\Filament\\Resources\\PostResource');
+    $first = ApiForgeResourceSetting::forResource('App\\Filament\\Resources\\PostResource');
     $second = ApiForgeResourceSetting::forResource('App\\Filament\\Resources\\PostResource');
 
     expect($first->id)->toBe($second->id);

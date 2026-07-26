@@ -2,10 +2,12 @@
 
 namespace YusufGenc34\FilamentApiForge\Services;
 
-use YusufGenc34\FilamentApiForge\Contracts\HasApi;
-use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
 use Filament\Facades\Filament;
 use Illuminate\Support\Collection;
+use YusufGenc34\FilamentApiForge\Attributes\ApiAction;
+use YusufGenc34\FilamentApiForge\Attributes\ApiVersion;
+use YusufGenc34\FilamentApiForge\Contracts\HasApi;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeResourceSetting;
 
 class ResourceDiscoveryService
 {
@@ -29,7 +31,7 @@ class ResourceDiscoveryService
         }
 
         foreach ($panels as $panel) {
-            $panelId   = $panel->getId();
+            $panelId = $panel->getId();
             $resources = $panel->getResources();
 
             foreach ($resources as $resourceClass) {
@@ -44,8 +46,8 @@ class ResourceDiscoveryService
                 }
 
                 /** @var HasApi $resourceClass */
-                $apiConfig       = $resourceClass::apiConfig();
-                $allMethods      = $apiConfig['allowed_methods']
+                $apiConfig = $resourceClass::apiConfig();
+                $allMethods = $apiConfig['allowed_methods']
                     ?? config('filament-api-forge.discovery.allowed_methods', ['index', 'show', 'store', 'update', 'destroy']);
                 $disabledMethods = $setting ? ($setting->disabled_methods ?? []) : [];
 
@@ -56,13 +58,13 @@ class ResourceDiscoveryService
 
                 $this->discoveredResources->push([
                     'resource_class' => $resourceClass,
-                    'model_class'    => $resourceClass::getModel(),
-                    'slug'           => $resourceClass::getSlug(),
-                    'panel_id'       => $panelId,
-                    'api_config'     => $apiConfig,
-                    'label'          => $resourceClass::getModelLabel(),
-                    'plural_label'   => $resourceClass::getPluralModelLabel(),
-                    'versions'       => $this->resourceVersions($resourceClass),
+                    'model_class' => $resourceClass::getModel(),
+                    'slug' => $resourceClass::getSlug(),
+                    'panel_id' => $panelId,
+                    'api_config' => $apiConfig,
+                    'label' => $resourceClass::getModelLabel(),
+                    'plural_label' => $resourceClass::getPluralModelLabel(),
+                    'versions' => $this->resourceVersions($resourceClass),
                 ]);
             }
         }
@@ -126,8 +128,8 @@ class ResourceDiscoveryService
     protected function resourceVersions(string $resourceClass): ?array
     {
         try {
-            $ref   = new \ReflectionClass($resourceClass);
-            $attrs = $ref->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiVersion::class);
+            $ref = new \ReflectionClass($resourceClass);
+            $attrs = $ref->getAttributes(ApiVersion::class);
 
             return $attrs ? $attrs[0]->newInstance()->versions : null;
         } catch (\Throwable) {
@@ -146,11 +148,30 @@ class ResourceDiscoveryService
             ?? config('filament-api-forge.discovery.allowed_methods', ['index', 'show', 'store', 'update', 'destroy']));
     }
 
-    public function getAllowedFilters(array $resource): array  { return $resource['api_config']['allowed_filters']  ?? []; }
-    public function getAllowedSorts(array $resource): array    { return $resource['api_config']['allowed_sorts']    ?? []; }
-    public function getAllowedIncludes(array $resource): array { return $resource['api_config']['allowed_includes'] ?? []; }
-    public function getAllowedFields(array $resource): array   { return $resource['api_config']['allowed_fields']   ?? []; }
-    public function getRequiredScopes(array $resource): array  { return $resource['api_config']['scopes']           ?? []; }
+    public function getAllowedFilters(array $resource): array
+    {
+        return $resource['api_config']['allowed_filters'] ?? [];
+    }
+
+    public function getAllowedSorts(array $resource): array
+    {
+        return $resource['api_config']['allowed_sorts'] ?? [];
+    }
+
+    public function getAllowedIncludes(array $resource): array
+    {
+        return $resource['api_config']['allowed_includes'] ?? [];
+    }
+
+    public function getAllowedFields(array $resource): array
+    {
+        return $resource['api_config']['allowed_fields'] ?? [];
+    }
+
+    public function getRequiredScopes(array $resource): array
+    {
+        return $resource['api_config']['scopes'] ?? [];
+    }
 
     /**
      * Get all #[ApiAction] methods for a resource class.
@@ -165,15 +186,15 @@ class ResourceDiscoveryService
             $ref = new \ReflectionClass($resourceClass);
 
             foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_STATIC) as $method) {
-                $attrs = $method->getAttributes(\YusufGenc34\FilamentApiForge\Attributes\ApiAction::class);
+                $attrs = $method->getAttributes(ApiAction::class);
 
                 foreach ($attrs as $attr) {
-                    /** @var \YusufGenc34\FilamentApiForge\Attributes\ApiAction $instance */
+                    /** @var ApiAction $instance */
                     $instance = $attr->newInstance();
                     $actions[$instance->name] = [
-                        'name'   => $instance->name,
+                        'name' => $instance->name,
                         'method' => $instance->method,
-                        'scope'  => $instance->scope,
+                        'scope' => $instance->scope,
                         'record' => $instance->record,
                     ];
                 }

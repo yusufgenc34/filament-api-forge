@@ -2,7 +2,6 @@
 
 namespace YusufGenc34\FilamentApiForge\Filament\V5;
 
-use YusufGenc34\FilamentApiForge\Contracts\FilamentSchemaAdapter;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -10,6 +9,7 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use YusufGenc34\FilamentApiForge\Contracts\FilamentSchemaAdapter;
 
 class SchemaAdapter implements FilamentSchemaAdapter
 {
@@ -39,18 +39,18 @@ class SchemaAdapter implements FilamentSchemaAdapter
             ToggleButtons::make('scopes')
                 ->label('Permissions')
                 ->options([
-                    'read'   => 'Read',
-                    'write'  => 'Write',
+                    'read' => 'Read',
+                    'write' => 'Write',
                     'delete' => 'Delete',
                 ])
                 ->icons([
-                    'read'   => 'heroicon-o-eye',
-                    'write'  => 'heroicon-o-pencil-square',
+                    'read' => 'heroicon-o-eye',
+                    'write' => 'heroicon-o-pencil-square',
                     'delete' => 'heroicon-o-trash',
                 ])
                 ->colors([
-                    'read'   => 'info',
-                    'write'  => 'warning',
+                    'read' => 'info',
+                    'write' => 'warning',
                     'delete' => 'danger',
                 ])
                 ->multiple()

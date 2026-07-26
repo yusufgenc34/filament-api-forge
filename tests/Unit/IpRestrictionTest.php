@@ -13,6 +13,7 @@ beforeEach(function () {
 function callPrivateMethod(object $object, string $method, array $args = []): mixed
 {
     $ref = new ReflectionMethod($object, $method);
+
     return $ref->invoke($object, ...$args);
 }
 

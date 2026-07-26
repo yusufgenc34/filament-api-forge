@@ -1,22 +1,22 @@
 <?php
 
-use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
-use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Carbon;
+use YusufGenc34\FilamentApiForge\Models\ApiForgeToken;
+use YusufGenc34\FilamentApiForge\Services\ApiForgeTokenService;
 
 beforeEach(function () {
     $this->service = app(ApiForgeTokenService::class);
     $this->user = User::create([
-        'name'     => 'Test User',
-        'email'    => 'token-service@example.com',
+        'name' => 'Test User',
+        'email' => 'token-service@example.com',
         'password' => bcrypt('password'),
     ]);
 });
 
 it('creates a token with forge_ prefix', function () {
     $result = $this->service->create($this->user, [
-        'name'   => 'Service Token',
+        'name' => 'Service Token',
         'scopes' => ['read'],
     ]);
 
@@ -26,7 +26,7 @@ it('creates a token with forge_ prefix', function () {
 
 it('stores only the hash, never the plain text', function () {
     $result = $this->service->create($this->user, [
-        'name'   => 'Hash Check',
+        'name' => 'Hash Check',
         'scopes' => ['read', 'write'],
     ]);
 
@@ -49,8 +49,8 @@ it('creates token with expiration date', function () {
     $expires = Carbon::now()->addDays(30);
 
     $result = $this->service->create($this->user, [
-        'name'       => 'Expiring Token',
-        'scopes'     => ['read'],
+        'name' => 'Expiring Token',
+        'scopes' => ['read'],
         'expires_at' => $expires,
     ]);
 
@@ -59,8 +59,8 @@ it('creates token with expiration date', function () {
 
 it('creates token with allowed resources restriction', function () {
     $result = $this->service->create($this->user, [
-        'name'              => 'Restricted Token',
-        'scopes'            => ['read'],
+        'name' => 'Restricted Token',
+        'scopes' => ['read'],
         'allowed_resources' => ['posts', 'comments'],
     ]);
 

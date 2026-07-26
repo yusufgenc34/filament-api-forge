@@ -2,11 +2,12 @@
 
 namespace YusufGenc34\FilamentApiForge\Tests;
 
-use YusufGenc34\FilamentApiForge\FilamentApiForgeServiceProvider;
-use Orchestra\Testbench\TestCase as Orchestra;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Orchestra\Testbench\TestCase as Orchestra;
+use Spatie\QueryBuilder\QueryBuilderServiceProvider;
+use YusufGenc34\FilamentApiForge\FilamentApiForgeServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -22,14 +23,14 @@ abstract class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
-            \Spatie\QueryBuilder\QueryBuilderServiceProvider::class,
+            QueryBuilderServiceProvider::class,
             FilamentApiForgeServiceProvider::class,
         ];
     }
 
     protected function defineEnvironment($app): void
     {
-        $app['config']->set('filament-api-forge', require __DIR__ . '/../config/filament-api-forge.php');
+        $app['config']->set('filament-api-forge', require __DIR__.'/../config/filament-api-forge.php');
         $app['config']->set('filament-api-forge.auth.enabled', true);
         $app['config']->set('filament-api-forge.api_prefix', 'api/v1');
         $app['config']->set('filament-api-forge.rate_limit', 60);
